@@ -25,6 +25,62 @@ AppPipe integrates **YARP (Yet Another Reverse Proxy)** to act as the central en
 * **Environment Injection**: When a service has a reference to another (declared via `.WithReference(dependency)`), AppPipe injects service discovery environment variables in the format:
   `services__<Name>__http__0` = `http://localhost:<Port>/` (for local runs) or the relative virtual directory path (for IIS).
 
+#### 🔄 Configuring the Gateway via YARP
+The AppPipe Gateway binds YARP services directly to the standard .NET `IConfiguration` under the `"ReverseProxy"` section. This enables the user to fully customize routing rules, load balancing, request transforms, and HTTP timeouts.
+
+There are three ways to customize the YARP routing setup:
+
+##### A. In the `appsettings.json` Configuration
+Any properties defined under the `"ReverseProxy"` section of your `appsettings.json` are automatically loaded and merged by Kestrel at startup. You can configure custom routes, clusters, HTTP request properties, and transforms:
+
+```json
+{
+  "ReverseProxy": {
+    "Routes": {
+      "custom-service-route": {
+        "ClusterId": "custom-service-cluster",
+        "Match": {
+          "Path": "/custom-route/{**catch-all}"
+        },
+        "Transforms": [
+          { "RequestHeader": "X-Gateway-Custom", "Append": "AppPipe" }
+        ]
+      }
+    },
+    "Clusters": {
+      "custom-service-cluster": {
+        "Destinations": {
+          "node1": {
+            "Address": "http://localhost:5005/"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+##### B. Programmatically via `ConfigureGateway` in `Program.cs`
+You can configure YARP proxy rules, CORS policies, rate limiters, or custom destination selection policies in C# by calling `.ConfigureGateway()` on your orchestrator's builder. This provides direct access to the `WebApplicationBuilder`:
+
+```csharp
+var builder = AppPipeHostingApp.CreateBuilder(args);
+
+builder.ConfigureGateway(gatewayBuilder =>
+{
+    // Register custom YARP configuration in-memory or load from a custom provider
+    gatewayBuilder.Services.AddReverseProxy()
+        .LoadFromMemory(myCustomRoutes, myCustomClusters);
+
+    // Register custom authorization or rate limiter policies that YARP routes can bind to
+    gatewayBuilder.Services.AddRateLimiter(options => { ... });
+});
+```
+
+##### C. Local Development Auto-Generation (`yarp.json`)
+For local runs, the `AppPipeDevHostRunner` scans the active topology and automatically writes a `yarp.json` file in the project's root folder, configuring catch-all routing based on your registered microservices and their assigned dynamic ports. This file is loaded at startup to support hot-reloading configurations.
+
+
 ### 2. OTLP Telemetry Collector
 AppPipe exposes a local HTTP/2 Kestrel endpoint that acts as a fully compliant **OpenTelemetry (OTLP) Collector** supporting gRPC exports.
 * **Zero Configuration**: Microservices configure standard .NET OTLP exporters, which automatically detect and output telemetry to this local gateway.

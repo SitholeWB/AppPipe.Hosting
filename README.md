@@ -24,7 +24,7 @@ With AppPipe, you get a beautiful, unified developer dashboard and service disco
 
 ## 📖 Detailed Documentation
 
-For an in-depth dive into how AppPipe works under the hood and how to configure it for production deployment, refer to the **[Complete Features & Configuration Reference Guide](file:///D:/Git/Github/AppPipe.Hosting/docs/features-and-options.md)**.
+For an in-depth dive into how AppPipe works under the hood and how to configure it for production deployment, refer to the **[Complete Features & Configuration Reference Guide](docs/features-and-options.md)**.
 
 It covers:
 * ⚙️ **Fluent Topology Options**: Detailed documentation for `.WithEndpoint()`, `.WithAppPool()`, `.WithServiceAccount()`, `.WithReference()`, and other builder methods.
@@ -38,28 +38,40 @@ It covers:
 ## ⚙️ Architecture
 
 ```mermaid
-graph TD
-    Client(Browser/Client) -->|HTTP| Gateway
+graph LR
+    %% Styles
+    classDef client fill:#f97316,stroke:#ea580c,stroke-width:2px,color:#fff;
+    classDef gateway fill:#0284c7,stroke:#0369a1,stroke-width:2px,color:#fff;
+    classDef service fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff;
+    classDef telemetry fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff;
+    classDef store fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff;
+    classDef dashboard fill:#ec4899,stroke:#db2777,stroke-width:2px,color:#fff;
 
-    subgraph User's Application Space
-        Backend1[Backend Microservice A]
-        Backend2[Backend Microservice B]
-    end
-
-    subgraph AppPipe.Hosting NuGet Package
-        Gateway[AppPipe Gateway / YARP]
-        TelemetryPort[Gateway Telemetry Port]
-        Store[In-Memory Telemetry Store]
-        Dashboard[Blazor Dashboard UI]
+    Client[Browser / API Client]:::client
+    
+    subgraph AppPipeHost ["AppPipe Host Application"]
+        Gateway[YARP Gateway Proxy]:::gateway
+        TelemetryPort[Telemetry gRPC Port]:::telemetry
+        Store[(In-Memory Store)]:::store
+        Dashboard[Blazor Dashboard UI]:::dashboard
         
-        TelemetryPort --> Store
-        Store --> Dashboard
+        TelemetryPort -->|Write| Store
+        Store -->|Read| Dashboard
     end
 
-    Gateway -->|Service Discovery Routing| Backend1
-    Gateway -->|Service Discovery Routing| Backend2
-    Backend1 -->|OTLP gRPC| TelemetryPort
-    Backend2 -->|OTLP gRPC| TelemetryPort
+    subgraph Microservices ["User Microservices Space"]
+        ServiceA[Microservice A]:::service
+        ServiceB[Microservice B]:::service
+    end
+
+    %% Request Routing Flow
+    Client -->|1. HTTP Request| Gateway
+    Gateway -->|2. Route proxy| ServiceA
+    Gateway -->|2. Route proxy| ServiceB
+
+    %% Telemetry Flow
+    ServiceA -.->|3. OTLP Traces/Logs/Metrics| TelemetryPort
+    ServiceB -.->|3. OTLP Traces/Logs/Metrics| TelemetryPort
 ```
 
 ---
@@ -134,11 +146,16 @@ You can customize the dashboard and gateway behavior in your `appsettings.json` 
 | :--- | :--- | :--- | :--- |
 | `Dashboard:UseWebSockets` | `bool` | `false` | Set to `true` to enable real-time UI updates via WebSockets. Set to `false` for resource-friendly static HTML rendering. |
 
+### 🔄 Configuring the Gateway via YARP
+AppPipe's gateway binds natively to standard .NET configuration under the `"ReverseProxy"` section. You can define custom routes, clusters, HTTP request properties, rate-limiting, and transforms inside your `appsettings.json`, or programmatically configure them using `.ConfigureGateway()` in `Program.cs`.
+
+For a complete guide, step-by-step code samples, and auto-generated routing details, see the **[Configuring the Gateway via YARP Guide](docs/features-and-options.md#configuring-the-gateway-via-yarp)**.
+
 ---
 
 ## 💾 Customizing the Telemetry Database
 
-By default, AppPipe retains telemetry in a circular in-memory buffer ([InMemoryTelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). For production environments, you can plug in any database (such as SQLite, PostgreSQL, SQL Server, or ClickHouse) by implementing the [ITelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and registering it:
+By default, AppPipe retains telemetry in a circular in-memory buffer ([InMemoryTelemetryStore](AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). For production environments, you can plug in any database (such as SQLite, PostgreSQL, SQL Server, or ClickHouse) by implementing the [ITelemetryStore](AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and registering it:
 
 ```csharp
 builder.ConfigureGateway(gatewayBuilder =>
@@ -147,7 +164,7 @@ builder.ConfigureGateway(gatewayBuilder =>
 });
 ```
 
-For complete step-by-step code examples, see the [Custom Telemetry Database Configuration Guide](file:///d:/Git/Github/AppPipe.Hosting/database-configuration.md).
+For complete step-by-step code examples, see the [Custom Telemetry Database Configuration Guide](database-configuration.md).
 
 ---
 
