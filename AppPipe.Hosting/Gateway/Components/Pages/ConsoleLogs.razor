@@ -1,0 +1,271 @@
+@page "/logs"
+@using AppPipe.Gateway.Services
+@inject ITelemetryStore Store
+@implements IDisposable
+
+<PageTitle>Console Logs - AppPipe.NET</PageTitle>
+
+<div class="page-container">
+    <div class="page-header">
+        <h1>Console Logs</h1>
+        <div class="header-actions">
+            <input type="text" @bind="searchTerm" @bind:event="oninput" placeholder="Filter logs..." class="aspire-input" />
+            <button class="aspire-btn" @onclick="() => isPaused = !isPaused">
+                @(isPaused ? "▶ Resume" : "⏸ Pause")
+            </button>
+        </div>
+    </div>
+
+    <div class="aspire-table-container console-container">
+        <table class="aspire-table console-table">
+            <thead>
+                <tr>
+                    <th style="width: 150px">Timestamp</th>
+                    <th style="width: 100px">Level</th>
+                    <th style="width: 200px">Service</th>
+                    <th>Message</th>
+                    <th style="width: 100px">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!GetFilteredLogs().Any())
+                {
+                    <tr>
+                        <td colspan="4" class="empty-cell">Waiting for logs...</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var log in GetFilteredLogs())
+                    {
+                        var severityClass = log.Severity?.ToLowerInvariant() ?? "info";
+                        
+                        var isExpanded = expandedLogId == log.GetHashCode().ToString();
+
+                        <tr class="@(isExpanded ? "expanded-row" : "")">
+                            <td class="font-mono">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
+                            <td><span class="sev-badge @severityClass">@log.Severity</span></td>
+                            <td class="service-col">@log.ServiceName</td>
+                            <td class="msg-col">@log.Message</td>
+                            <td>
+                                @if (log.Attributes != null && log.Attributes.Any())
+                                {
+                                    <button class="aspire-btn-link" @onclick="() => ToggleLog(log.GetHashCode().ToString())">
+                                        @(isExpanded ? "Hide" : "View")
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                        @if (isExpanded && log.Attributes != null)
+                        {
+                            <tr class="details-row">
+                                <td colspan="5">
+                                    <div class="waterfall-container">
+                                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 2rem; font-family: monospace; font-size: 0.85rem;">
+                                            @foreach (var attr in log.Attributes)
+                                            {
+                                                <div style="color: var(--text-muted);">@attr.Key</div>
+                                                <div style="word-break: break-all;">@attr.Value</div>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .aspire-input {
+        background: var(--item-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.4rem 0.75rem;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        width: 250px;
+    }
+    
+    .aspire-input:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
+    
+    .aspire-btn {
+        background: var(--item-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.4rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    .aspire-btn:hover {
+        background: var(--panel-bg-hover);
+    }
+
+    .empty-cell {
+        text-align: center;
+        color: var(--text-muted);
+        padding: 3rem !important;
+    }
+
+    .font-mono { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.85rem; }
+    
+    .console-table th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .console-table td {
+        vertical-align: top;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 0.85rem;
+    }
+
+    .service-col {
+        color: var(--accent);
+    }
+
+    .msg-col {
+        word-break: break-all;
+    }
+
+    .sev-badge {
+        font-weight: 600;
+        font-size: 0.75rem;
+        padding: 0.1rem 0.4rem;
+        border-radius: 3px;
+        text-transform: uppercase;
+    }
+    
+    .sev-badge.info, .sev-badge.information { background: var(--badge-info-bg); color: var(--badge-info-text); }
+    .sev-badge.warn, .sev-badge.warning { background: rgba(234, 179, 8, 0.15); color: #ca8a04; }
+    .sev-badge.error, .sev-badge.fatal { background: var(--badge-error-bg); color: var(--badge-error-text); }
+    .sev-badge.debug, .sev-badge.trace { background: var(--border-color); color: var(--text-muted); }
+    
+    [data-theme="dark"] .sev-badge.warn, [data-theme="dark"] .sev-badge.warning { color: #facc15; }
+
+    .expanded-row td {
+        border-bottom: none !important;
+        background: var(--panel-bg-hover);
+    }
+    
+    .details-row td {
+        padding: 0 !important;
+        background: var(--panel-bg-hover);
+        border-bottom: 1px solid var(--border-color) !important;
+    }
+
+    .waterfall-container {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+        background: rgba(0, 0, 0, 0.05);
+    }
+    
+    [data-theme="dark"] .waterfall-container {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .aspire-btn-link {
+        background: none;
+        border: none;
+        color: var(--accent);
+        cursor: pointer;
+        font-weight: 500;
+        padding: 0;
+    }
+    
+    .aspire-btn-link:hover {
+        text-decoration: underline;
+    }
+</style>
+
+@code {
+    private bool isPaused = false;
+    private string searchTerm = "";
+    private List<ParsedLog> cachedLogs = new();
+    private string? expandedLogId = null;
+
+    private void ToggleLog(string logId)
+    {
+        if (expandedLogId == logId)
+            expandedLogId = null;
+        else
+            expandedLogId = logId;
+    }
+
+    protected override void OnInitialized()
+    {
+        Store.OnTelemetryReceived += OnTelemetryReceived;
+        UpdateCache();
+    }
+
+    private void OnTelemetryReceived()
+    {
+        if (!isPaused)
+        {
+            InvokeAsync(() => 
+            {
+                UpdateCache();
+                StateHasChanged();
+            });
+        }
+    }
+    
+    private void UpdateCache()
+    {
+        cachedLogs = Store.Logs
+            .OrderByDescending(l => l.Timestamp)
+            .Take(200)
+            .ToList();
+    }
+    
+    private IEnumerable<ParsedLog> GetFilteredLogs()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm)) return cachedLogs;
+        
+        var lowerSearch = searchTerm.ToLowerInvariant();
+        return cachedLogs.Where(l => 
+            l.Message?.ToLowerInvariant().Contains(lowerSearch) == true || 
+            l.ServiceName?.ToLowerInvariant().Contains(lowerSearch) == true
+        );
+    }
+
+    public void Dispose()
+    {
+        Store.OnTelemetryReceived -= OnTelemetryReceived;
+    }
+}

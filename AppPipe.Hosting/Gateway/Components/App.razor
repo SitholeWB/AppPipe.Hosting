@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+@using Microsoft.Extensions.Configuration
+@inject NavigationManager NavigationManager
+@inject IConfiguration Config
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="@NavigationManager.BaseUri" />
+    <link rel="stylesheet" href="_content/AppPipe.Hosting/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="_content/AppPipe.Hosting/app.css" />
+    <link rel="stylesheet" href="@(System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name + ".styles.css")" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <ImportMap />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <HeadOutlet @rendermode="CurrentRenderMode" />
+</head>
+
+<body>
+    <Routes @rendermode="CurrentRenderMode" />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+
+</html>
+
+@code {
+    private Microsoft.AspNetCore.Components.IComponentRenderMode? CurrentRenderMode =>
+        Config.GetValue<bool>("Dashboard:UseWebSockets", false) 
+        ? Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer 
+        : null;
+}

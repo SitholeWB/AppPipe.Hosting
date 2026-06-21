@@ -1,0 +1,270 @@
+@page "/metrics"
+@using AppPipe.Gateway.Services
+@using Microsoft.Extensions.Configuration
+@using OpenTelemetry.Proto.Collector.Metrics.V1
+@using OpenTelemetry.Proto.Metrics.V1
+@inject ITelemetryStore Store
+@inject IConfiguration Config
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>Metrics - AppPipe.NET</PageTitle>
+
+<div class="page-container">
+    <div class="page-header">
+        <h1>Metrics</h1>
+        <div class="header-actions">
+            <a href="@($"{Nav.BaseUri}metrics")" class="aspire-btn" style="text-decoration:none; display:flex; align-items:center; gap:0.25rem;">
+                🔄 Refresh
+            </a>
+        </div>
+    </div>
+
+    <div class="metrics-grid">
+        @if (!latestMetrics.Any())
+        {
+            <div class="empty-state">Waiting for metrics...</div>
+        }
+        else
+        {
+            @foreach (var metricKvp in latestMetrics)
+            {
+                var metricName = metricKvp.Key;
+                var dataPoints = metricKvp.Value;
+                var lastValue = dataPoints.LastOrDefault()?.Value ?? 0;
+                var maxVal = dataPoints.Any() ? dataPoints.Max(d => d.Value) : 1;
+                if (maxVal == 0) maxVal = 1;
+
+                <div class="metric-card">
+                    <div class="metric-header">
+                        <span class="metric-title">@metricName</span>
+                        <span class="metric-value font-mono">@Math.Round(lastValue, 2)</span>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <div class="chart-area">
+                            @foreach (var point in dataPoints)
+                            {
+                                var heightPct = (point.Value / maxVal) * 100;
+                                <div class="chart-bar" style="height: @Math.Max(heightPct, 1)%" title="@point.Timestamp.ToString("HH:mm:ss"): @Math.Round(point.Value, 2)"></div>
+                            }
+                        </div>
+                        <div class="chart-labels">
+                            <span>@dataPoints.FirstOrDefault()?.Timestamp.ToString("HH:mm")</span>
+                            <span>@dataPoints.LastOrDefault()?.Timestamp.ToString("HH:mm")</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<style>
+    .page-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding-bottom: 2rem;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .aspire-btn {
+        background: var(--item-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.4rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    .aspire-btn:hover {
+        background: var(--panel-bg-hover);
+    }
+
+    .empty-state {
+        text-align: center;
+        color: var(--text-muted);
+        padding: 4rem;
+        font-size: 1.1rem;
+        width: 100%;
+        grid-column: 1 / -1;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .metric-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .metric-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+
+    .metric-title {
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--text-main);
+        word-break: break-word;
+    }
+
+    .metric-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--accent);
+    }
+
+    .chart-container {
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .chart-area {
+        flex: 1;
+        display: flex;
+        align-items: flex-end;
+        gap: 2px;
+        padding-top: 10px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .chart-bar {
+        flex: 1;
+        background-color: var(--accent);
+        opacity: 0.7;
+        border-radius: 2px 2px 0 0;
+        transition: height 0.3s ease, opacity 0.2s ease;
+        min-width: 2px;
+    }
+
+    .chart-bar:hover {
+        opacity: 1;
+        background-color: var(--link-color);
+    }
+
+    .chart-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .font-mono { font-family: 'Consolas', 'Courier New', monospace; }
+</style>
+
+@code {
+    public record MetricDataPoint(DateTimeOffset Timestamp, double Value);
+    private Dictionary<string, List<MetricDataPoint>> latestMetrics = new();
+
+    protected override void OnInitialized()
+    {
+        Store.OnTelemetryReceived += OnTelemetryReceived;
+        UpdateCache();
+    }
+
+    private void OnTelemetryReceived()
+    {
+        if (Config.GetValue<bool>("Dashboard:UseWebSockets", false))
+        {
+            InvokeAsync(() => 
+            {
+                UpdateCache();
+                StateHasChanged();
+            });
+        }
+    }
+    
+    private void UpdateCache()
+    {
+        // Simple aggregation of the raw metrics queue from InMemoryTelemetryStore
+        var metricsList = Store.Metrics.ToList();
+        var aggregated = new Dictionary<string, List<MetricDataPoint>>();
+
+        foreach (var req in metricsList)
+        {
+            foreach (var rm in req.ResourceMetrics)
+            {
+                foreach (var sm in rm.ScopeMetrics)
+                {
+                    foreach (var m in sm.Metrics)
+                    {
+                        var name = m.Name;
+                        if (!aggregated.ContainsKey(name))
+                        {
+                            aggregated[name] = new List<MetricDataPoint>();
+                        }
+
+                        // Extract data points
+                        if (m.Gauge != null)
+                        {
+                            foreach (var dp in m.Gauge.DataPoints)
+                            {
+                                var val = dp.ValueCase == NumberDataPoint.ValueOneofCase.AsDouble ? dp.AsDouble : dp.AsInt;
+                                var ts = DateTimeOffset.FromUnixTimeMilliseconds((long)(dp.TimeUnixNano / 1_000_000));
+                                aggregated[name].Add(new MetricDataPoint(ts, val));
+                            }
+                        }
+                        else if (m.Sum != null)
+                        {
+                            foreach (var dp in m.Sum.DataPoints)
+                            {
+                                var val = dp.ValueCase == NumberDataPoint.ValueOneofCase.AsDouble ? dp.AsDouble : dp.AsInt;
+                                var ts = DateTimeOffset.FromUnixTimeMilliseconds((long)(dp.TimeUnixNano / 1_000_000));
+                                aggregated[name].Add(new MetricDataPoint(ts, val));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Limit data points per chart
+        var result = new Dictionary<string, List<MetricDataPoint>>();
+        foreach (var kvp in aggregated)
+        {
+            // Take the last 60 points
+            result[kvp.Key] = kvp.Value.OrderBy(d => d.Timestamp).TakeLast(60).ToList();
+        }
+        
+        latestMetrics = result;
+    }
+
+    private void Refresh()
+    {
+        UpdateCache();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Store.OnTelemetryReceived -= OnTelemetryReceived;
+    }
+}

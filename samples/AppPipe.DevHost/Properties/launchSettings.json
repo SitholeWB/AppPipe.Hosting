@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "AppPipe.DevHost": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:55115;http://localhost:55116"
+    }
+  }
+}

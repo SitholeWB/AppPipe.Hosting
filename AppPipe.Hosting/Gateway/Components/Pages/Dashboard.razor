@@ -1,0 +1,240 @@
+@page "/"
+@page "/dashboard"
+@using AppPipe.Hosting
+@using AppPipe.Gateway.Services
+@using Microsoft.Extensions.Configuration
+@inject ITelemetryStore Store
+@inject AppPipeApp? AppTopology
+@inject NavigationManager Nav
+@inject IConfiguration Config
+@implements IDisposable
+
+<PageTitle>Resources - AppPipe.NET</PageTitle>
+
+<div class="page-container">
+    <div class="page-header">
+        <h1>Resources</h1>
+        <div class="header-actions">
+            <a href="dashboard" class="aspire-btn" style="text-decoration:none; display:flex; align-items:center;">
+                🔄 Refresh
+            </a>
+        </div>
+    </div>
+
+    <!-- Overview Stats / Activity -->
+    <div class="overview-section">
+        <div class="aspire-card">
+            <h3>Telemetry Activity</h3>
+            <div class="graph-container">
+                <svg class="activity-svg" preserveAspectRatio="none" viewBox="0 0 100 100">
+                    @{
+                        var now = DateTimeOffset.UtcNow;
+                        var start = now.AddMinutes(-5); // Fixed 5 min window for overview
+                        
+                        // Bin traces into 50 buckets
+                        int bucketCount = 50;
+                        var buckets = new int[bucketCount];
+                        var runningProjects = AppTopology?.Resources.Count() ?? 0;
+                        var windowTicks = (now - start).Ticks;
+                        
+                        if (windowTicks > 0)
+                        {
+                            foreach (var t in Store.Traces.Values.Where(t => t.StartTime >= start))
+                            {
+                                var offset = (t.StartTime - start).Ticks;
+                                var bucket = (int)((offset * bucketCount) / windowTicks);
+                                if (bucket >= 0 && bucket < bucketCount)
+                                {
+                                    buckets[bucket]++;
+                                }
+                            }
+                        }
+
+                        int maxVal = buckets.Max();
+                        if (maxVal == 0) maxVal = 1; 
+                        
+                        for (int i = 0; i < bucketCount; i++)
+                        {
+                            var height = (buckets[i] * 100.0) / maxVal;
+                            var width = 100.0 / bucketCount;
+                            var x = i * width;
+                            var y = 100 - height;
+                            
+                            <rect x="@x" y="@y" width="@(width * 0.8)" height="@height" class="bar" />
+                        }
+                    }
+                </svg>
+            </div>
+            <div class="graph-footer">
+                <span class="text-muted">Last 5 Minutes</span>
+                <span class="text-muted">Total Active Traces: @Store.Traces.Count</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="aspire-table-container">
+        <table class="aspire-table">
+            <thead>
+                <tr>
+                    <th style="width: 250px">Name</th>
+                    <th>Type</th>
+                    <th style="width: 150px">State</th>
+                    <th style="width: 250px">Endpoints</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (AppTopology != null && AppTopology.Resources.Any())
+                {
+                    foreach (var resource in AppTopology.Resources)
+                    {
+                        var isIIS = Environment.GetEnvironmentVariable("APP_POOL_ID") != null;
+                        var endpointUrl = isIIS ? Nav.ToAbsoluteUri(resource.Name).ToString() : $"http://localhost:{resource.AssignedPort}";
+                        
+                        <tr>
+                            <td class="fw-semibold">@resource.Name</td>
+                            <td>@(resource.GetType().Name.Replace("Resource", ""))</td>
+                            <td><span class="status-badge success">Running</span></td>
+                            <td><a href="@endpointUrl" target="_blank" class="endpoint-link">@endpointUrl</a></td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="4" class="text-muted" style="text-align: center; padding: 2rem;">No resources detected</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        gap: 1.5rem;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .aspire-btn {
+        background: var(--item-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.4rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    .aspire-btn:hover {
+        background: var(--panel-bg-hover);
+    }
+
+    .overview-section {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .aspire-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.25rem;
+    }
+
+    .aspire-card h3 {
+        margin: 0 0 1rem 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .graph-container {
+        height: 80px;
+        width: 100%;
+    }
+    
+    .activity-svg {
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+    }
+    
+    .activity-svg .bar {
+        fill: var(--accent);
+        opacity: 0.8;
+        transition: height 0.3s ease, y 0.3s ease;
+        rx: 1;
+    }
+    
+    .activity-svg .bar:hover {
+        opacity: 1;
+        fill: #0ea5e9;
+    }
+
+    .graph-footer {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .fw-semibold { font-weight: 600; }
+    .text-muted { color: var(--text-muted); }
+
+    .status-badge {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+    
+    .status-badge.success {
+        background: var(--badge-success-bg);
+        color: var(--badge-success-text);
+    }
+    
+    .endpoint-link {
+        color: var(--accent);
+        text-decoration: none;
+    }
+    
+    .endpoint-link:hover {
+        text-decoration: underline;
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Store.OnTelemetryReceived += OnTelemetryReceived;
+    }
+
+    private void OnTelemetryReceived()
+    {
+        if (Config.GetValue<bool>("Dashboard:UseWebSockets", false))
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        Store.OnTelemetryReceived -= OnTelemetryReceived;
+    }
+}

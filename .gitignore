@@ -1,0 +1,27 @@
+## Build outputs
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+
+## IDE and OS files
+.vs/
+.vscode/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+.DS_Store
+Thumbs.db
+
+## User-specific files
+*.user
+*.userprefs
+
+## Package restore and publishing outputs
+*.nupkg
+*.snupkg
+
+## Local configurations & logs
+logs/
+*.log
+appsettings.local.json

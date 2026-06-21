@@ -1,0 +1,360 @@
+@page "/traces"
+@using AppPipe.Gateway.Services
+@using Microsoft.Extensions.Configuration
+@inject ITelemetryStore Store
+@inject NavigationManager Nav
+@inject IConfiguration Config
+@implements IDisposable
+
+<PageTitle>Traces - AppPipe.NET</PageTitle>
+
+<div class="page-container">
+    <div class="page-header">
+        <h1>Traces</h1>
+        <div class="header-actions">
+            <form method="get" action="@($"{Nav.BaseUri}traces")" style="display:flex; gap:0.5rem; margin:0;">
+                <input type="text" name="search" value="@SearchQuery" placeholder="Filter traces..." class="aspire-input" />
+                <button type="submit" class="aspire-btn">Filter</button>
+            </form>
+            <a href="@($"{Nav.BaseUri}traces?search={SearchQuery}")" class="aspire-btn" style="text-decoration:none; display:flex; align-items:center;">
+                🔄 Refresh
+            </a>
+        </div>
+    </div>
+
+    <div class="aspire-table-container">
+        <table class="aspire-table">
+            <thead>
+                <tr>
+                    <th style="width: 150px">Timestamp</th>
+                    <th style="width: 250px">Name</th>
+                    <th>Service</th>
+                    <th style="width: 100px">State</th>
+                    <th style="width: 100px">Duration</th>
+                    <th style="width: 100px">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!GetFilteredTraces().Any())
+                {
+                    <tr>
+                        <td colspan="6" class="empty-cell">Waiting for traces...</td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var trace in GetFilteredTraces())
+                    {
+                        var rootSpan = trace.RootSpan;
+                        var name = rootSpan?.Name ?? "Unknown Request";
+                        var service = rootSpan?.ServiceName ?? "Unknown";
+                        var isError = trace.HasError;
+                        var durationStr = trace.TotalDuration.TotalMilliseconds < 1 ? "< 1 ms" : $"{(int)trace.TotalDuration.TotalMilliseconds} ms";
+                        var statusCode = rootSpan?.HttpStatusCode?.ToString() ?? "200";
+                        var isExpanded = SearchQueryAndExpandMatch(trace.TraceId);
+
+                        <tr class="@(isExpanded ? "expanded-row" : "")">
+                            <td>@trace.StartTime.ToString("HH:mm:ss.fff")</td>
+                            <td class="fw-semibold">@name</td>
+                            <td><span class="service-badge">@service</span></td>
+                            <td>
+                                @if (isError)
+                                {
+                                    <span class="status-badge error">Error</span>
+                                }
+                                else
+                                {
+                                    <span class="status-badge success">Success</span>
+                                }
+                            </td>
+                            <td class="font-mono">@durationStr</td>
+                            <td>
+                                <a class="aspire-btn-link" style="text-decoration:none;" href="@($"{Nav.BaseUri}traces?search={SearchQuery}&expand={(isExpanded ? "" : trace.TraceId)}")">
+                                    @(isExpanded ? "Hide" : "View")
+                                </a>
+                            </td>
+                        </tr>
+                        @if (isExpanded)
+                        {
+                            <tr class="details-row">
+                                <td colspan="6">
+                                    <div class="waterfall-container">
+                                        <h5>Span Flamegraph</h5>
+                                        <div class="flamegraph-container">
+                                            @if (trace.RootSpan != null)
+                                            {
+                                                var totalMs = trace.TotalDuration.TotalMilliseconds == 0 ? 1 : trace.TotalDuration.TotalMilliseconds;
+                                                @RenderFlamegraphNode(trace.RootSpan, totalMs, trace.StartTime, 0)
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .aspire-input {
+        background: var(--item-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.4rem 0.75rem;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        width: 250px;
+    }
+    
+    .aspire-input:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
+    
+    .aspire-btn {
+        background: var(--item-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 0.4rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    .aspire-btn:hover {
+        background: var(--panel-bg-hover);
+    }
+    
+    .aspire-btn-link {
+        background: none;
+        border: none;
+        color: var(--accent);
+        cursor: pointer;
+        font-weight: 500;
+        padding: 0;
+    }
+    
+    .aspire-btn-link:hover {
+        text-decoration: underline;
+    }
+    
+    .empty-cell {
+        text-align: center;
+        color: var(--text-muted);
+        padding: 3rem !important;
+    }
+    
+    .fw-semibold { font-weight: 600; }
+    .font-mono { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.85rem; }
+    .text-muted { color: var(--text-muted); font-size: 0.8rem; }
+    
+    .service-badge {
+        background: var(--panel-bg-hover);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+    
+    .status-badge {
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+    
+    .status-badge.success {
+        background: var(--badge-success-bg);
+        color: var(--badge-success-text);
+    }
+    
+    .status-badge.error {
+        background: var(--badge-error-bg);
+        color: var(--badge-error-text);
+    }
+    
+    .expanded-row td {
+        border-bottom: none !important;
+        background: var(--panel-bg-hover);
+    }
+    
+    .details-row td {
+        padding: 0 !important;
+        background: var(--panel-bg-hover);
+        border-bottom: 2px solid var(--border-color) !important;
+    }
+    
+    .waterfall-container {
+        padding: 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .waterfall-container h5 {
+        margin: 0 0 1rem 0;
+        font-size: 1rem;
+    }
+    
+    .flamegraph-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        background: rgba(0, 0, 0, 0.02);
+        padding: 0.5rem;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+    }
+    
+    [data-theme="dark"] .flamegraph-container {
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .flame-row {
+        position: relative;
+        height: 24px;
+        width: 100%;
+    }
+
+    .flame-bar {
+        position: absolute;
+        height: 100%;
+        background-color: var(--accent);
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        padding: 0 6px;
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 500;
+        cursor: default;
+        transition: opacity 0.2s;
+    }
+
+    .flame-bar:hover {
+        opacity: 0.85;
+    }
+
+    .flame-bar.error {
+        background-color: var(--badge-error-text);
+    }
+
+    .flame-label {
+        pointer-events: none;
+    }
+
+    .flame-service {
+        opacity: 0.8;
+        font-weight: normal;
+        margin-left: 4px;
+    }
+</style>
+@code {
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? SearchQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "expand")]
+    public string? Expand { get; set; }
+
+    private List<ParsedTrace> cachedTraces = new();
+
+    private RenderFragment RenderFlamegraphNode(ParsedSpan span, double traceDurationMs, DateTimeOffset traceStartTime, int depth) => __builder =>
+    {
+        var offsetMs = (span.StartTime - traceStartTime).TotalMilliseconds;
+        var durationMs = span.Duration.TotalMilliseconds;
+        var leftPct = (offsetMs / traceDurationMs) * 100;
+        var widthPct = Math.Max((durationMs / traceDurationMs) * 100, 0.5);
+
+        <div class="flame-row">
+            <div class="flame-bar @(span.IsError ? "error" : "")" style="left: @leftPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%; width: @widthPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;" title="@span.Name (@Math.Round(durationMs, 2) ms)">
+                <span class="flame-label">@span.Name <span class="flame-service">@span.ServiceName</span></span>
+            </div>
+        </div>
+        @foreach (var child in span.Children.OrderBy(c => c.StartTime))
+        {
+            @RenderFlamegraphNode(child, traceDurationMs, traceStartTime, depth + 1)
+        }
+    };
+
+    protected override void OnInitialized()
+    {
+        Store.OnTelemetryReceived += OnTelemetryReceived;
+        UpdateCache();
+    }
+
+    protected override void OnParametersSet()
+    {
+        UpdateCache();
+    }
+
+    private void OnTelemetryReceived()
+    {
+        if (Config.GetValue<bool>("Dashboard:UseWebSockets", false))
+        {
+            InvokeAsync(() => 
+            {
+                UpdateCache();
+                StateHasChanged();
+            });
+        }
+    }
+    
+    private void UpdateCache()
+    {
+        cachedTraces = Store.Traces.Values
+            .OrderByDescending(t => t.StartTime)
+            .Take(100)
+            .ToList();
+    }
+
+    private bool SearchQueryAndExpandMatch(string? traceId)
+    {
+        return Expand == traceId;
+    }
+
+    private IEnumerable<ParsedTrace> GetFilteredTraces()
+    {
+        if (string.IsNullOrWhiteSpace(SearchQuery)) return cachedTraces;
+        
+        var lowerSearch = SearchQuery.ToLowerInvariant();
+        return cachedTraces.Where(t => 
+            t.TraceId?.ToLowerInvariant().Contains(lowerSearch) == true || 
+            (t.RootSpan?.Name?.ToLowerInvariant().Contains(lowerSearch) == true) ||
+            (t.RootSpan?.ServiceName?.ToLowerInvariant().Contains(lowerSearch) == true)
+        );
+    }
+
+    public void Dispose()
+    {
+        Store.OnTelemetryReceived -= OnTelemetryReceived;
+    }
+}

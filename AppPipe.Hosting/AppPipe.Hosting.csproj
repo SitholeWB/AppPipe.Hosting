@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);ConsoleUse</NoWarn>
+    
+    <!-- NuGet Metadata -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Version>1.0.0</Version>
+    <Authors>Welcome Bonginhlahla Sithole</Authors>
+    <Company>Welcome Bonginhlahla Sithole</Company>
+    <Description>A lightweight telemetry dashboard and service discovery gateway runner for microservices, serving as an on-premises alternative to .NET Aspire dashboard. Supports IIS and Linux deployment with dynamic port bindings and OTLP metrics, logs, and traces.</Description>
+    <PackageProjectUrl>https://github.com/SitholeWB/AppPipe.Hosting</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/SitholeWB/AppPipe.Hosting</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>aspire;telemetry;otlp;iis;dashboard;gateway;microservices;dotnet;dotnet-aspire;opentelemetry</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModularPipelines" Version="2.42.228" />
+    <PackageReference Include="ModularPipelines.DotNet" Version="2.42.228" />
+    <PackageReference Include="Grpc.AspNetCore" Version="2.80.0" />
+    <PackageReference Include="OpenTelemetry" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+    <PackageReference Include="Yarp.ReverseProxy" Version="2.3.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.31.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.80.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Protos\opentelemetry-proto-main\**\*.proto" GrpcServices="Server" ProtoRoot="Protos\opentelemetry-proto-main" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/DevHost/">
+    <Project Path="DevHost/TestingApp.DevHost.csproj" />
+  </Folder>
+  <Project Path="../AppPipe.Core/AppPipe.Core.csproj" />
+  <Project Path="BackendWorker/BackendWorker.csproj" />
+  <Project Path="FrontendApi/FrontendApi.csproj" />
+</Solution>

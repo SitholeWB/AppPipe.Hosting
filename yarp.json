@@ -1,0 +1,5 @@
+{ "ReverseProxy": { "Routes": {
+"BackendWorkerRoute": { "ClusterId": "BackendWorkerCluster", "Match": { "Path": "/backendworker/{**catch-all}" } },"FrontendApiRoute": { "ClusterId": "FrontendApiCluster", "Match": { "Path": "/frontendapi/{**catch-all}" } }
+}, "Clusters": {
+"BackendWorkerCluster": { "Destinations": { "destination1": { "Address": "http://localhost:65282/" } } },"FrontendApiCluster": { "Destinations": { "destination1": { "Address": "http://localhost:65283/" } } }
+} } }
