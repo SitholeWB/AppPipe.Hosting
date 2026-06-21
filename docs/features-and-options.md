@@ -4,7 +4,7 @@ This reference guide provides an in-depth explanation of all features, topology 
 
 ---
 
-## ðŸ›ï¸ Core Features & Capabilities
+## ⚙️ Core Features & Capabilities
 
 ```mermaid
 graph TD
@@ -46,7 +46,7 @@ A visual dashboard that allows real-time diagnostics:
 
 ---
 
-## âš™ï¸ AppResource Fluent Topology Options
+## ⚙️ AppResource Fluent Topology Options
 
 ### Project Registration Methods
 
@@ -121,7 +121,7 @@ var backend = builder.AddProject("BackendWorker");
 
 ---
 
-## ðŸ’» Full End-to-End Orchestrator Example (`Program.cs`)
+## 💻 Full End-to-End Orchestrator Example (`Program.cs`)
 
 Below is a complete, production-ready `Program.cs` orchestrator topology showing configuration binding, dashboard customization, and fluent resource definition:
 
@@ -224,7 +224,7 @@ internal class Program
 
 ---
 
-## ðŸ“„ Reference Configuration Layout (`appsettings.json`)
+## 📄 Reference Configuration Layout (`appsettings.json`)
 
 You can define all environment-specific parameters inside your deployment `appsettings.json`:
 
@@ -251,7 +251,7 @@ You can define all environment-specific parameters inside your deployment `appse
 
 ---
 
-## ðŸ¢ On-Premises Deployment Targets (IIS & Service Internals)
+## 🏢 On-Premises Deployment Targets (IIS & Service Internals)
 
 ### 1. IIS Deployments
 * **Virtual Directories**: Registers the orchestrator (Dashboard) and microservices as sub-applications under the specified IIS Site.
@@ -273,7 +273,7 @@ You can define all environment-specific parameters inside your deployment `appse
 
 ---
 
-## ðŸš€ DevOps CI/CD Pipelines (Deploying Pre-Compiled DLLs)
+## 🚀 DevOps CI/CD Pipelines (Deploying Pre-Compiled DLLs)
 
 In professional DevOps environments, you separate compilation from deployment. 
 
@@ -423,7 +423,7 @@ stages:
 
 ---
 
-## ðŸ› ï¸ CLI Troubleshooting & Verification Commands
+## 🛠️ CLI Troubleshooting & Verification Commands
 
 Here are common diagnostic commands to execute when checking on-premises status:
 

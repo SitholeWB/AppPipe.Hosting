@@ -1,4 +1,4 @@
-# AppPipe.Hosting ðŸš€
+# AppPipe.Hosting 🚀
 
 [![NuGet Version](https://img.shields.io/nuget/v/AppPipe.Hosting.svg)](https://www.nuget.org/packages/AppPipe.Hosting)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/AppPipe.Hosting.svg)](https://www.nuget.org/packages/AppPipe.Hosting)
@@ -8,23 +8,34 @@
 
 With AppPipe, you get a beautiful, unified developer dashboard and service discovery proxy without the overhead of cloud-only architectures.
 
-ðŸ“– **Detailed Documentation**: For a comprehensive explanation of every configuration setting, fluent builder method, and CI/CD deployment model, please read the [Features & Configuration Reference Guide](file:///D:/Git/Github/AppPipe.Hosting/docs/features-and-options.md).
-
 ---
 
-## ðŸŒŸ Features
+## 🌟 Features
 
-- **ðŸ“Š OpenTelemetry Collector & Dashboard**: Collects OTLP traces, logs, and metrics in-memory from your services. Displays them in a gorgeous Blazor dashboard (complete with Light/Dark modes, trace waterfall flamegraphs, structured console logs, and metric charts).
-- **ðŸ”€ Unified Gateway & Routing**: Powered by **YARP (Yet Another Reverse Proxy)**, AppPipe hosts a central routing gateway that automatically maps and proxies requests to your backend microservices.
-- **ðŸ”Œ Dynamic Port Allocation**: Automatically assigns free ports to your applications during local runs or deployment pipelines, preventing port conflict issues.
-- **ðŸ¢ Native IIS & systemd Integration**: Out-of-the-box deployment module using `ModularPipelines` that automates publishing, creating AppPools, registering IIS sub-applications, setting environment variables, and handling systemd service setups.
-- **âš¡ Dual Render Modes (Resource-Optimized)**:
+- **📊 OpenTelemetry Collector & Dashboard**: Collects OTLP traces, logs, and metrics in-memory from your services. Displays them in a gorgeous Blazor dashboard (complete with Light/Dark modes, trace waterfall flamegraphs, structured console logs, and metric charts).
+- **🔄 Unified Gateway & Routing**: Powered by **YARP (Yet Another Reverse Proxy)**, AppPipe hosts a central routing gateway that automatically maps and proxies requests to your backend microservices.
+- **🔌 Dynamic Port Allocation**: Automatically assigns free ports to your applications during local runs or deployment pipelines, preventing port conflict issues.
+- **🏢 Native IIS & systemd Integration**: Out-of-the-box deployment module using `ModularPipelines` that automates publishing, creating AppPools, registering IIS sub-applications, setting environment variables, and handling systemd service setups.
+- **⚡ Dual Render Modes (Resource-Optimized)**:
   - **Interactive (WebSocket-based)**: Real-time, live-updating metrics and traces.
   - **SSR (Server-Side Rendered)**: WebSockets are disabled to minimize CPU and memory footprint, utilizing native forms and base-relative routing. Perfect for production or restricted IIS host environments.
 
 ---
 
-## ðŸ›ï¸ Architecture
+## 📖 Detailed Documentation
+
+For an in-depth dive into how AppPipe works under the hood and how to configure it for production deployment, refer to the **[Complete Features & Configuration Reference Guide](file:///D:/Git/Github/AppPipe.Hosting/docs/features-and-options.md)**.
+
+It covers:
+* ⚙️ **Fluent Topology Options**: Detailed documentation for `.WithEndpoint()`, `.WithAppPool()`, `.WithServiceAccount()`, `.WithReference()`, and other builder methods.
+* 🏢 **On-Premises IIS & Service Deployment**: Technical details regarding AppPool permissions, sub-application path matching, self-healing file locks, and the IIS token overwrite startup filter.
+* 🐧 **Linux systemd & Reverse Proxy Layouts**: Guidance and auto-generated configurations for systemd units, Nginx location blocks, and Caddy directives.
+* 🚀 **DevOps CI/CD Integration**: Guidelines on using `--prepublished-dir` to deploy pre-compiled DLLs directly via GitHub Actions or Azure DevOps pipelines without requiring the .NET SDK on the target server.
+* 🛠️ **CLI Troubleshooting & Diagnostic Commands**: PowerShell and CMD commands for testing IIS sites, AppPool recycles, port conflict resolution, and enabling standard output logging.
+
+---
+
+## ⚙️ Architecture
 
 ```mermaid
 graph TD
@@ -62,7 +73,7 @@ dotnet add package AppPipe.Hosting
 
 ---
 
-## ðŸš€ Quick Start
+## 🚀 Quick Start
 
 ### 1. Define your App Topology
 Configure your services and their relationships in your entry point:
@@ -107,7 +118,7 @@ builder.Services.AddOpenTelemetry()
 
 ---
 
-## ðŸ› ï¸ Configuration
+## 🛠️ Configuration
 
 You can customize the dashboard and gateway behavior in your `appsettings.json` or environment variables:
 
@@ -125,7 +136,7 @@ You can customize the dashboard and gateway behavior in your `appsettings.json` 
 
 ---
 
-## ðŸ’¾ Customizing the Telemetry Database
+## 💾 Customizing the Telemetry Database
 
 By default, AppPipe retains telemetry in a circular in-memory buffer ([InMemoryTelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). For production environments, you can plug in any database (such as SQLite, PostgreSQL, SQL Server, or ClickHouse) by implementing the [ITelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and registering it:
 
@@ -140,7 +151,7 @@ For complete step-by-step code examples, see the [Custom Telemetry Database Conf
 
 ---
 
-## ðŸ¢ On-Premises Deployment
+## 🏢 On-Premises Deployment
 
 AppPipe includes a built-in deployment module utilizing `ModularPipelines` to automate publishing and deployments directly to IIS, Windows Services, or Linux `systemd`.
 
@@ -193,7 +204,7 @@ dotnet run --project YourDevHost.csproj -- --deploy windows-service
 
 ---
 
-## ðŸš€ DevOps CI/CD Pipelines (Deploying Pre-Compiled DLLs)
+## 🚀 DevOps CI/CD Pipelines (Deploying Pre-Compiled DLLs)
 
 In a typical CI/CD pipeline, the build agent compiles the code (creating DLL artifacts), and the release agent downloads the pre-compiled files onto the target environment where **no source code or `.csproj` files exist**.
 
@@ -250,6 +261,6 @@ builder.AddProject("BackendWorker")
 ---
 
 
-## ðŸ“„ License
+## 📄 License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
