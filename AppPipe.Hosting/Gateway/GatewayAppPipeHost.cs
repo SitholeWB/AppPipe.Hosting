@@ -7,11 +7,11 @@ using Microsoft.Extensions.Hosting;
 
 namespace AppPipe.Hosting;
 
-public class GatewayHost
+public class GatewayAppPipeHost
 {
     private WebApplication? _app;
 
-    public async Task<(int DashboardPort, int TelemetryPort)> StartAsync(string yarpConfigFile, AppPipeApp? topology = null, Action<WebApplicationBuilder>? configureBuilder = null, Action<WebApplication>? configureApp = null)
+    public async Task<(int DashboardPort, int TelemetryPort)> StartAsync(string yarpConfigFile, AppPipeHostingApp? topology = null, Action<WebApplicationBuilder>? configureBuilder = null, Action<WebApplication>? configureApp = null)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {

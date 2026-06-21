@@ -20,10 +20,10 @@ namespace AppPipe.Hosting;
 [DependsOn<PublishProjectsModule>]
 public class WindowsIISDeploymentModule : Module<CommandResult[]>
 {
-    private readonly AppPipeApp _app;
+    private readonly AppPipeHostingApp _app;
     private readonly DeploymentOptions _options;
 
-    public WindowsIISDeploymentModule(AppPipeApp app, DeploymentOptions options)
+    public WindowsIISDeploymentModule(AppPipeHostingApp app, DeploymentOptions options)
     {
         _app = app;
         _options = options;
@@ -43,6 +43,7 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
         int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Server.LingerState = new System.Net.Sockets.LingerOption(true, 0);
         listener.Stop();
         return port;
     }
@@ -74,7 +75,7 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
 
         foreach (var resource in _app.Resources)
         {
-            if (resource is ProjectResource project)
+            if (resource is AppPipeHostingProjectResource project)
             {
                 var appPath = project.AppPath ?? $"{basePath}/{project.Name}";
                 if (appPath == "" || appPath == "/")
@@ -127,7 +128,7 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
         return results.ToArray();
     }
 
-    private async Task DeployProjectToIIS(IPipelineContext context, ProjectResource project, string appPath, string appCmdPath, CancellationToken cancellationToken, List<CommandResult> results, Dictionary<string, string> envVars, bool outOfProcess)
+    private async Task DeployProjectToIIS(IPipelineContext context, AppPipeHostingProjectResource project, string appPath, string appCmdPath, CancellationToken cancellationToken, List<CommandResult> results, Dictionary<string, string> envVars, bool outOfProcess)
     {
         var publishPath = Path.Combine(Environment.CurrentDirectory, "publish", project.Name);
         var appPoolName = project.AppPoolName ?? $"{project.Name}Pool";

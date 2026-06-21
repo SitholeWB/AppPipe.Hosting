@@ -16,6 +16,7 @@ public class GatewayRoutingTests
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
         int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Server.LingerState = new System.Net.Sockets.LingerOption(true, 0);
         listener.Stop();
         return port;
     }
@@ -70,13 +71,13 @@ public class GatewayRoutingTests
         await File.WriteAllTextAsync(tempYarpFile, yarpConfig);
 
         // 3. Start Gateway Host
-        var builder = AppPipeApp.CreateBuilder(null!);
-        var hostProject = new ProjectResource("AppPipe.DevHost", "");
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
+        var hostProject = new AppPipeHostingProjectResource("AppPipe.DevHost", "");
         hostProject.WithEndpoint(0);
         builder.HostProject = hostProject;
         var app = builder.Build();
 
-        var gatewayHost = new GatewayHost();
+        var gatewayHost = new GatewayAppPipeHost();
         var ports = await gatewayHost.StartAsync(tempYarpFile, app);
 
         // 4. Act: Request through the Gateway

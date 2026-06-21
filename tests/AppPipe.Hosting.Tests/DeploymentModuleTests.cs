@@ -10,7 +10,7 @@ public class DeploymentModuleTests
     public void WindowsServiceDeploymentModule_ShouldInitialize()
     {
         // Arrange
-        var builder = AppPipeApp.CreateBuilder(null!);
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
         var app = builder.Build();
 
         // Act
@@ -24,7 +24,7 @@ public class DeploymentModuleTests
     public void WindowsIISDeploymentModule_ShouldInitialize()
     {
         // Arrange
-        var builder = AppPipeApp.CreateBuilder(null!);
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
         var app = builder.Build();
         var options = new DeploymentOptions();
 
@@ -39,7 +39,7 @@ public class DeploymentModuleTests
     public void LinuxSystemdDeploymentModule_ShouldInitialize()
     {
         // Arrange
-        var builder = AppPipeApp.CreateBuilder(null!);
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
         var app = builder.Build();
         var options = new DeploymentOptions();
 

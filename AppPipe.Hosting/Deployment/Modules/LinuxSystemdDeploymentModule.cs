@@ -17,10 +17,10 @@ namespace AppPipe.Hosting;
 [DependsOn<PublishProjectsModule>]
 public class LinuxSystemdDeploymentModule : Module<CommandResult[]>
 {
-    private readonly AppPipeApp _app;
+    private readonly AppPipeHostingApp _app;
     private readonly DeploymentOptions _options;
 
-    public LinuxSystemdDeploymentModule(AppPipeApp app, DeploymentOptions options)
+    public LinuxSystemdDeploymentModule(AppPipeHostingApp app, DeploymentOptions options)
     {
         _app = app;
         _options = options;
@@ -40,6 +40,7 @@ public class LinuxSystemdDeploymentModule : Module<CommandResult[]>
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
         int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Server.LingerState = new System.Net.Sockets.LingerOption(true, 0);
         listener.Stop();
         return port;
     }
@@ -49,7 +50,7 @@ public class LinuxSystemdDeploymentModule : Module<CommandResult[]>
         var results = new List<CommandResult>();
         
         // 1. Gather all projects to run under systemd
-        var projectsToDeploy = new List<(ProjectResource Project, Dictionary<string, string> EnvVars)>();
+        var projectsToDeploy = new List<(AppPipeHostingProjectResource Project, Dictionary<string, string> EnvVars)>();
         var telemetryPort = GetFreePort();
 
         if (_app.HostProject != null)
@@ -66,7 +67,7 @@ public class LinuxSystemdDeploymentModule : Module<CommandResult[]>
 
         foreach (var resource in _app.Resources)
         {
-            if (resource is ProjectResource project)
+            if (resource is AppPipeHostingProjectResource project)
             {
                 var envVars = new Dictionary<string, string>
                 {
@@ -186,7 +187,7 @@ WantedBy=multi-user.target
             // Routes for Child Projects
             foreach (var resource in _app.Resources)
             {
-                if (resource is ProjectResource project)
+                if (resource is AppPipeHostingProjectResource project)
                 {
                     var customPath = project.AppPath;
                     var paths = new List<string>();
@@ -265,7 +266,7 @@ WantedBy=multi-user.target
             // Route for Child Projects
             foreach (var resource in _app.Resources)
             {
-                if (resource is ProjectResource project)
+                if (resource is AppPipeHostingProjectResource project)
                 {
                     var customPath = project.AppPath;
                     var paths = new List<string>();

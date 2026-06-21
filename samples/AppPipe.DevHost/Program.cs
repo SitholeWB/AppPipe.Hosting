@@ -12,10 +12,10 @@ internal class Program
     private static async Task Main(string[] args)
     {
         // 1. Initialize the builder
-        var builder = AppPipeApp.CreateBuilder(args);
+        var builder = AppPipeHostingApp.CreateBuilder(args);
 
         // Initialize the HostProject explicitly without adding it to the child projects list
-        builder.HostProject = new ProjectResource("AppPipe.DevHost", "");
+        builder.HostProject = new AppPipeHostingProjectResource("AppPipe.DevHost", "");
         // We can't use AddProject("AppPipe.DevHost") because it adds it to the child project list
         // to be executed.
 
@@ -25,7 +25,7 @@ internal class Program
                            .WithEnvironment("LOG_LEVEL", "Debug");
 
         // Add the internal backend service using compile-safe project names
-        var backend = builder.AddProject(Projects.BackendWorker)
+        var backend = builder.AddProject(AppPipeProjects.BackendWorker)
                              .WithEndpoint(7002)
                              .WithEnvironment("LOG_LEVEL", "Debug")
                              .WithAppPool("CustomBackendPool")
@@ -36,7 +36,7 @@ internal class Program
                              .WithServiceStartType("auto");
 
         // Add the public frontend API and tell the orchestrator it depends on the backend
-        var frontend = builder.AddProject(Projects.FrontendApi)
+        var frontend = builder.AddProject(AppPipeProjects.FrontendApi)
                               .WithReference(backend)
                               .WithEndpoint(7003)
                               .WithEnvironment("LOG_LEVEL", "Debug")
@@ -108,13 +108,13 @@ internal class Program
         {
             // We are deployed inside IIS, Windows Service, or Linux systemd Service. Run the
             // Dashboard/Gateway only.
-            var gateway = new AppPipe.Hosting.GatewayHost();
+            var gateway = new AppPipe.Hosting.GatewayAppPipeHost();
             await gateway.StartAsync(string.Empty, app, app.ConfigureGatewayAction);
             await Task.Delay(-1);
         }
         else
         {
-            var runner = new DevHostRunner(app);
+            var runner = new AppPipeDevHostRunner(app);
             await runner.RunAsync();
         }
     }

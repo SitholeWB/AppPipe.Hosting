@@ -17,9 +17,9 @@ namespace AppPipe.Hosting;
 [DependsOn<PublishProjectsModule>]
 public class WindowsServiceDeploymentModule : Module<CommandResult[]>
 {
-    private readonly AppPipeApp _app;
+    private readonly AppPipeHostingApp _app;
 
-    public WindowsServiceDeploymentModule(AppPipeApp app)
+    public WindowsServiceDeploymentModule(AppPipeHostingApp app)
     {
         _app = app;
     }
@@ -38,6 +38,7 @@ public class WindowsServiceDeploymentModule : Module<CommandResult[]>
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
         int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Server.LingerState = new System.Net.Sockets.LingerOption(true, 0);
         listener.Stop();
         return port;
     }
@@ -65,7 +66,7 @@ public class WindowsServiceDeploymentModule : Module<CommandResult[]>
         // 2. Deploy Child Projects
         foreach (var resource in _app.Resources)
         {
-            if (resource is ProjectResource project)
+            if (resource is AppPipeHostingProjectResource project)
             {
                 var envVars = new Dictionary<string, string>
                 {
@@ -96,7 +97,7 @@ public class WindowsServiceDeploymentModule : Module<CommandResult[]>
 
     private async Task DeployService(
         IPipelineContext context,
-        ProjectResource project,
+        AppPipeHostingProjectResource project,
         Dictionary<string, string> envVars,
         CancellationToken cancellationToken,
         List<CommandResult> results)

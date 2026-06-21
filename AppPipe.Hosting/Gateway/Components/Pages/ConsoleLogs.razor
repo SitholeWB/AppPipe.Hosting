@@ -24,7 +24,6 @@
                     <th style="width: 100px">Level</th>
                     <th style="width: 200px">Service</th>
                     <th>Message</th>
-                    <th style="width: 100px">Details</th>
                 </tr>
             </thead>
             <tbody>
@@ -39,39 +38,33 @@
                     @foreach (var log in GetFilteredLogs())
                     {
                         var severityClass = log.Severity?.ToLowerInvariant() ?? "info";
-                        
-                        var isExpanded = expandedLogId == log.GetHashCode().ToString();
 
-                        <tr class="@(isExpanded ? "expanded-row" : "")">
+                        <tr>
                             <td class="font-mono">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
                             <td><span class="sev-badge @severityClass">@log.Severity</span></td>
                             <td class="service-col">@log.ServiceName</td>
-                            <td class="msg-col">@log.Message</td>
-                            <td>
+                            <td class="msg-col">
                                 @if (log.Attributes != null && log.Attributes.Any())
                                 {
-                                    <button class="aspire-btn-link" @onclick="() => ToggleLog(log.GetHashCode().ToString())">
-                                        @(isExpanded ? "Hide" : "View")
-                                    </button>
+                                    <details class="log-details-accordion">
+                                        <summary class="log-summary-msg">@log.Message</summary>
+                                        <div class="waterfall-container">
+                                            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1.5rem; font-family: monospace; font-size: 0.8rem; margin-top: 0.5rem;">
+                                                @foreach (var attr in log.Attributes)
+                                                {
+                                                    <div style="color: var(--text-muted); font-weight: 500;">@attr.Key</div>
+                                                    <div style="word-break: break-all;">@attr.Value</div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </details>
+                                }
+                                else
+                                {
+                                    @log.Message
                                 }
                             </td>
                         </tr>
-                        @if (isExpanded && log.Attributes != null)
-                        {
-                            <tr class="details-row">
-                                <td colspan="5">
-                                    <div class="waterfall-container">
-                                        <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 2rem; font-family: monospace; font-size: 0.85rem;">
-                                            @foreach (var attr in log.Attributes)
-                                            {
-                                                <div style="color: var(--text-muted);">@attr.Key</div>
-                                                <div style="word-break: break-all;">@attr.Value</div>
-                                            }
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
                     }
                 }
             </tbody>
@@ -178,38 +171,31 @@
     
     [data-theme="dark"] .sev-badge.warn, [data-theme="dark"] .sev-badge.warning { color: #facc15; }
 
-    .expanded-row td {
-        border-bottom: none !important;
-        background: var(--panel-bg-hover);
+    .log-details-accordion {
+        width: 100%;
     }
     
-    .details-row td {
-        padding: 0 !important;
-        background: var(--panel-bg-hover);
-        border-bottom: 1px solid var(--border-color) !important;
+    .log-summary-msg {
+        cursor: pointer;
+        user-select: none;
+        outline: none;
+        font-weight: 500;
+    }
+    
+    .log-summary-msg:hover {
+        color: var(--accent);
     }
 
     .waterfall-container {
-        padding: 1rem 1.5rem;
-        border-top: 1px solid var(--border-color);
-        background: rgba(0, 0, 0, 0.05);
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--border-color);
+        background: rgba(0, 0, 0, 0.02);
+        border-radius: 4px;
+        margin-top: 0.5rem;
     }
     
     [data-theme="dark"] .waterfall-container {
-        background: rgba(255, 255, 255, 0.03);
-    }
-
-    .aspire-btn-link {
-        background: none;
-        border: none;
-        color: var(--accent);
-        cursor: pointer;
-        font-weight: 500;
-        padding: 0;
-    }
-    
-    .aspire-btn-link:hover {
-        text-decoration: underline;
+        background: rgba(255, 255, 255, 0.02);
     }
 </style>
 
@@ -217,15 +203,7 @@
     private bool isPaused = false;
     private string searchTerm = "";
     private List<ParsedLog> cachedLogs = new();
-    private string? expandedLogId = null;
-
-    private void ToggleLog(string logId)
-    {
-        if (expandedLogId == logId)
-            expandedLogId = null;
-        else
-            expandedLogId = logId;
-    }
+    // Toggle state is now handled natively by HTML <details> tag
 
     protected override void OnInitialized()
     {

@@ -46,7 +46,7 @@ A visual dashboard that allows real-time diagnostics:
 
 ---
 
-## ⚙️ AppResource Fluent Topology Options
+## ⚙️ AppPipeHostingResource Fluent Topology Options
 
 ### Project Registration Methods
 
@@ -66,16 +66,16 @@ You can register microservices using strongly-typed string constants generated a
   
   > [!NOTE]
   > **Referencing Shared Code or Extension Libraries:**
-  > If the orchestrator project references a helper library or a shared extension library (e.g. adding extensions to `AppPipeAppBuilder`) that it needs to consume code from, you can disable the automatic decoupling by setting the `AppProject="false"` metadata on the reference:
+  > If the orchestrator project references a helper library or a shared extension library (e.g. adding extensions to `AppPipeHostingAppBuilder`) that it needs to consume code from, you can disable the automatic decoupling by setting the `AppProject="false"` metadata on the reference:
   > ```xml
   > <ProjectReference Include="..\MySharedLibrary\MySharedLibrary.csproj" AppProject="false" />
   > ```
   
-  At build time, AppPipe automatically generates a helper class `Projects` containing project names:
+  At build time, AppPipe automatically generates a helper class `AppPipeProjects` containing project names:
   ```csharp
   namespace AppPipe.Hosting
   {
-      public static class Projects
+      public static class AppPipeProjects
       {
           public const string BackendWorker = "BackendWorker";
           public const string FrontendApi = "FrontendApi";
@@ -84,7 +84,7 @@ You can register microservices using strongly-typed string constants generated a
   ```
   You can then register the project in `Program.cs` like this:
   ```csharp
-  var backend = builder.AddProject(Projects.BackendWorker);
+  var backend = builder.AddProject(AppPipeProjects.BackendWorker);
   ```
 * **Pros**: Refactoring-safe and compile-time validated. If a project is renamed or removed, you will get a compile-time build error. There are no runtime loading dependencies or file copying issues.
 * **Cons**: Requires adding decoupled `<ProjectReference>` configurations in the orchestrator project file.
@@ -107,8 +107,8 @@ var backend = builder.AddProject("BackendWorker");
 | :--- | :--- | :--- |
 | `.WithEndpoint(port)` | `int` | Explicitly binds the application port. If omitted, a free port is dynamically allocated. |
 | `.WithEnvironment(key, val)`| `string, string` | Injects custom environment variables into the process. |
-| `.WithReference(dep)` | `AppResource` | Sets up service discovery and links the current project to the dependency. |
-| `.WaitFor(dep)` | `AppResource` | Delays startup of the resource until the dependency's port is active. |
+| `.WithReference(dep)` | `AppPipeHostingResource` | Sets up service discovery and links the current project to the dependency. |
+| `.WaitFor(dep)` | `AppPipeHostingResource` | Delays startup of the resource until the dependency's port is active. |
 | `.WithAppPool(name)` | `string` | Sets the custom IIS Application Pool name for this service. |
 | `.WithIISSite(siteName)` | `string` | Sets the target IIS Site (defaults to `"Default Web Site"`). |
 | `.WithAppPath(path)` | `string` | Sets the custom virtual application path. For Windows IIS, this maps to the sub-application virtual path under the site (e.g. `"/api"`). For Linux Nginx and Caddy reverse proxies, this determines the location routing block path (e.g. `location /api/`). Empty string `""` or `"/"` deploys the app directly as the root application (`/`) of the site/proxy. |
@@ -146,11 +146,11 @@ internal class Program
             .Build();
 
         // 2. Initialize the AppPipe App Builder
-        var builder = AppPipeApp.CreateBuilder(args);
+        var builder = AppPipeHostingApp.CreateBuilder(args);
 
         // 3. Customize and configure the Dashboard itself (HostProject)
         var dashboardName = config["Dashboard:Name"] ?? "AppPipeDashboard";
-        builder.HostProject = new ProjectResource(dashboardName, "")
+        builder.HostProject = new AppPipeHostingProjectResource(dashboardName, "")
             .WithEndpoint(7001)
             .WithIISSite(config["Dashboard:IISSiteName"] ?? "Default Web Site")
             .WithAppPath(config["Dashboard:AppPath"] ?? "/") // Deployed at root site level '/'
@@ -208,7 +208,7 @@ internal class Program
                  Environment.GetEnvironmentVariable("WINDOWS_SERVICE") == "true")
         {
             // Running inside IIS/Service environment. Run Dashboard gateway only.
-            var gateway = new GatewayHost();
+            var gateway = new GatewayAppPipeHost();
             await gateway.StartAsync(string.Empty, app, app.ConfigureGatewayAction);
             await Task.Delay(-1); // Keep alive
         }

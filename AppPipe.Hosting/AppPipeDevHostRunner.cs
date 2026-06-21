@@ -4,11 +4,11 @@ using System.Net.Sockets;
 
 namespace AppPipe.Hosting;
 
-public class DevHostRunner
+public class AppPipeDevHostRunner
 {
-    private readonly AppPipeApp _app;
+    private readonly AppPipeHostingApp _app;
 
-    public DevHostRunner(AppPipeApp app)
+    public AppPipeDevHostRunner(AppPipeHostingApp app)
     {
         _app = app ?? throw new ArgumentNullException(nameof(app));
     }
@@ -38,11 +38,11 @@ public class DevHostRunner
         yarpConfig.AppendLine(string.Join(",", clusters));
         yarpConfig.AppendLine("} } }");
 
-        var yarpConfigFile = System.IO.Path.GetFullPath("yarp.json");
-        System.IO.File.WriteAllText(yarpConfigFile, yarpConfig.ToString());
+        var yarpConfigFile = Path.GetFullPath("yarp.json");
+        await File.WriteAllTextAsync(yarpConfigFile, yarpConfig.ToString());
 
         // 2. Start Gateway Internally
-        var gatewayHost = new GatewayHost();
+        var gatewayHost = new GatewayAppPipeHost();
         var ports = await gatewayHost.StartAsync(yarpConfigFile, _app, _app.ConfigureGatewayAction);
         Console.WriteLine($"AppPipe Gateway (Dashboard & Proxy) started on http://localhost:{ports.DashboardPort}");
         Console.WriteLine($"-> Dashboard: http://localhost:{ports.DashboardPort}/dashboard");
@@ -60,7 +60,7 @@ public class DevHostRunner
         await gatewayHost.StopAsync();
     }
 
-    private async Task StartResourceAsync(AppResource resource, int gatewayPort)
+    private async Task StartResourceAsync(AppPipeHostingResource resource, int gatewayPort)
     {
         foreach (var dep in resource.WaitDependencies)
         {
@@ -98,13 +98,13 @@ public class DevHostRunner
             RedirectStandardError = true,
         };
 
-        if (resource is ProjectResource proj)
+        if (resource is AppPipeHostingProjectResource proj)
         {
             startInfo.FileName = "dotnet";
             startInfo.Arguments = $"run --no-launch-profile --project {proj.ProjectPath}";
             startInfo.WorkingDirectory = System.IO.Path.GetDirectoryName(proj.ProjectPath);
         }
-        else if (resource is ExecutableResource exec)
+        else if (resource is ExecutableAppPipeHostingResource exec)
         {
             startInfo.FileName = exec.Command;
             startInfo.Arguments = string.Join(" ", exec.Args);
@@ -148,6 +148,7 @@ public class DevHostRunner
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Server.LingerState = new LingerOption(true, 0);
         listener.Stop();
         return port;
     }

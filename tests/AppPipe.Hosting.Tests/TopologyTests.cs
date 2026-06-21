@@ -12,7 +12,7 @@ public class TopologyTests
         var args = new[] { "--deploy", "iis" };
 
         // Act
-        var builder = AppPipeApp.CreateBuilder(args);
+        var builder = AppPipeHostingApp.CreateBuilder(args);
 
         // Assert
         Assert.NotNull(builder);
@@ -23,7 +23,7 @@ public class TopologyTests
     public void AddProject_ShouldConfigureNameAndPath()
     {
         // Arrange
-        var builder = AppPipeApp.CreateBuilder(null!);
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
 
         // Act
         var project = builder.AddProject("MyTestProject", "C:\\projects\\MyTestProject.csproj");
@@ -38,7 +38,7 @@ public class TopologyTests
     public void FluentExtensions_ShouldConfigureAllProperties()
     {
         // Arrange
-        var builder = AppPipeApp.CreateBuilder(null!);
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
         var project = builder.AddProject("Worker", "C:\\projects\\Worker.csproj");
 
         // Act
@@ -72,7 +72,7 @@ public class TopologyTests
     public void WithReference_ShouldInjectServiceDiscoveryVariables()
     {
         // Arrange
-        var builder = AppPipeApp.CreateBuilder(null!);
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
         var backend = builder.AddProject("Backend", "C:\\projects\\Backend.csproj").WithEndpoint(5001);
         var frontend = builder.AddProject("Frontend", "C:\\projects\\Frontend.csproj").WithEndpoint(5002);
 

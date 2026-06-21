@@ -14,9 +14,9 @@ namespace AppPipe.Hosting;
 
 public class PublishProjectsModule : Module<CommandResult[]>
 {
-    private readonly AppPipeApp _app;
+    private readonly AppPipeHostingApp _app;
 
-    public PublishProjectsModule(AppPipeApp app)
+    public PublishProjectsModule(AppPipeHostingApp app)
     {
         _app = app;
     }
@@ -42,7 +42,7 @@ public class PublishProjectsModule : Module<CommandResult[]>
                 servicesToStop.Add(_app.HostProject.Name);
             foreach (var r in _app.Resources)
             {
-                if (r is ProjectResource p)
+                if (r is AppPipeHostingProjectResource p)
                     servicesToStop.Add(p.Name);
             }
 
@@ -78,7 +78,7 @@ public class PublishProjectsModule : Module<CommandResult[]>
 
         foreach (var resource in _app.Resources)
         {
-            if (resource is AppPipe.Hosting.ProjectResource project)
+            if (resource is AppPipe.Hosting.AppPipeHostingProjectResource project)
             {
                 var outputPath = Path.Combine(Environment.CurrentDirectory, "publish", project.Name);
                 

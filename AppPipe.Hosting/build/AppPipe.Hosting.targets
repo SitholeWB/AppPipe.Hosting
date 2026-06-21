@@ -1,4 +1,7 @@
 <Project>
+  <PropertyGroup>
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
+  </PropertyGroup>
   <Target Name="ConfigureAppPipeProjectReferences" BeforeTargets="ResolveProjectReferences;BeforeBuild">
     <ItemGroup>
       <!-- Automatically inject decoupling metadata to ProjectReference items unless they explicitly opt out via AppProject="false" -->
@@ -27,7 +30,7 @@
       <CodeLines Include="// &lt;auto-generated /&gt;" />
       <CodeLines Include="namespace AppPipe.Hosting" />
       <CodeLines Include="{" />
-      <CodeLines Include="    public static class Projects" />
+      <CodeLines Include="    public static class AppPipeProjects" />
       <CodeLines Include="    {" />
       <CodeLines Include="        public const string %(ProjectReferenceNames.Identity) = &quot;%(ProjectReferenceNames.Identity)&quot;%3B" />
       <CodeLines Include="    }" />

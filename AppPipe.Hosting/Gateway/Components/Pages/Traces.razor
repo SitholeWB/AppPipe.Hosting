@@ -12,89 +12,100 @@
     <div class="page-header">
         <h1>Traces</h1>
         <div class="header-actions">
-            <form method="get" action="@($"{Nav.BaseUri}traces")" style="display:flex; gap:0.5rem; margin:0;">
-                <input type="text" name="search" value="@SearchQuery" placeholder="Filter traces..." class="aspire-input" />
-                <button type="submit" class="aspire-btn">Filter</button>
+            <form method="get" action="@($"{Nav.BaseUri}traces")" class="search-form">
+                <div class="search-input-wrapper">
+                    <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                    <input type="text" name="search" value="@SearchQuery" placeholder="Filter by trace ID, span, service..." class="aspire-input" />
+                </div>
+                <button type="submit" class="aspire-btn primary">Filter</button>
+                @if (!string.IsNullOrWhiteSpace(SearchQuery))
+                {
+                    <a href="@($"{Nav.BaseUri}traces")" class="aspire-btn" style="text-decoration:none;">Clear</a>
+                }
             </form>
-            <a href="@($"{Nav.BaseUri}traces?search={SearchQuery}")" class="aspire-btn" style="text-decoration:none; display:flex; align-items:center;">
-                🔄 Refresh
+            <a href="@($"{Nav.BaseUri}traces?search={SearchQuery}")" class="aspire-btn refresh-btn">
+                <svg class="refresh-icon" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                Refresh
             </a>
         </div>
     </div>
 
-    <div class="aspire-table-container">
-        <table class="aspire-table">
-            <thead>
-                <tr>
-                    <th style="width: 150px">Timestamp</th>
-                    <th style="width: 250px">Name</th>
-                    <th>Service</th>
-                    <th style="width: 100px">State</th>
-                    <th style="width: 100px">Duration</th>
-                    <th style="width: 100px">Details</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (!GetFilteredTraces().Any())
+    <div class="traces-list">
+        @if (!GetFilteredTraces().Any())
+        {
+            <div class="empty-state">
+                <svg class="empty-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                <h3>No Traces Found</h3>
+                <p>Configure your microservices to send OpenTelemetry traces to this dashboard.</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var trace in GetFilteredTraces())
+            {
+                var rootSpan = trace.RootSpan;
+                var name = rootSpan?.Name ?? "Unknown Request";
+                var service = rootSpan?.ServiceName ?? "Unknown";
+                var isError = trace.HasError;
+                var durationStr = trace.TotalDuration.TotalMilliseconds < 1 ? "< 1 ms" : $"{(int)trace.TotalDuration.TotalMilliseconds} ms";
+                
+                var method = rootSpan?.HttpMethod ?? "GET";
+                var methodLower = method.ToLowerInvariant();
+                var methodClass = methodLower switch
                 {
-                    <tr>
-                        <td colspan="6" class="empty-cell">Waiting for traces...</td>
-                    </tr>
-                }
-                else
-                {
-                    @foreach (var trace in GetFilteredTraces())
-                    {
-                        var rootSpan = trace.RootSpan;
-                        var name = rootSpan?.Name ?? "Unknown Request";
-                        var service = rootSpan?.ServiceName ?? "Unknown";
-                        var isError = trace.HasError;
-                        var durationStr = trace.TotalDuration.TotalMilliseconds < 1 ? "< 1 ms" : $"{(int)trace.TotalDuration.TotalMilliseconds} ms";
-                        var statusCode = rootSpan?.HttpStatusCode?.ToString() ?? "200";
-                        var isExpanded = SearchQueryAndExpandMatch(trace.TraceId);
+                    "get" => "get",
+                    "post" => "post",
+                    "put" => "put",
+                    "delete" => "delete",
+                    _ => "other"
+                };
 
-                        <tr class="@(isExpanded ? "expanded-row" : "")">
-                            <td>@trace.StartTime.ToString("HH:mm:ss.fff")</td>
-                            <td class="fw-semibold">@name</td>
-                            <td><span class="service-badge">@service</span></td>
-                            <td>
-                                @if (isError)
+                var urlPath = rootSpan?.UrlPath ?? name;
+                var isPreExpanded = SearchQueryAndExpandMatch(trace.TraceId);
+
+                <details class="trace-card" open="@(isPreExpanded ? "true" : null)">
+                    <summary class="trace-summary">
+                        <div class="trace-meta">
+                            <span class="trace-time">@trace.StartTime.ToString("HH:mm:ss.fff")</span>
+                            <div class="trace-name-container">
+                                <span class="trace-method @methodClass">@method</span>
+                                <span class="trace-path" title="@urlPath">@urlPath</span>
+                            </div>
+                            <span class="trace-service-badge">@service</span>
+                        </div>
+                        <div class="trace-stats">
+                            <div class="trace-duration-badge" title="Total Duration">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:0.2rem;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                                @durationStr
+                            </div>
+                            @if (isError)
+                            {
+                                <span class="trace-status-badge error">Error</span>
+                            }
+                            else
+                            {
+                                <span class="trace-status-badge success">Success</span>
+                            }
+                            <svg class="chevron-icon" viewBox="0 0 24 24">
+                                <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/>
+                            </svg>
+                        </div>
+                    </summary>
+                    <div class="trace-details-content">
+                        <div class="waterfall-container">
+                            <h4>Waterfall Timeline</h4>
+                            <div class="waterfall-tree">
+                                @if (trace.RootSpan != null)
                                 {
-                                    <span class="status-badge error">Error</span>
+                                    var totalMs = trace.TotalDuration.TotalMilliseconds == 0 ? 1 : trace.TotalDuration.TotalMilliseconds;
+                                    @RenderFlamegraphNode(trace.RootSpan, totalMs, trace.StartTime, 0)
                                 }
-                                else
-                                {
-                                    <span class="status-badge success">Success</span>
-                                }
-                            </td>
-                            <td class="font-mono">@durationStr</td>
-                            <td>
-                                <a class="aspire-btn-link" style="text-decoration:none;" href="@($"{Nav.BaseUri}traces?search={SearchQuery}&expand={(isExpanded ? "" : trace.TraceId)}")">
-                                    @(isExpanded ? "Hide" : "View")
-                                </a>
-                            </td>
-                        </tr>
-                        @if (isExpanded)
-                        {
-                            <tr class="details-row">
-                                <td colspan="6">
-                                    <div class="waterfall-container">
-                                        <h5>Span Flamegraph</h5>
-                                        <div class="flamegraph-container">
-                                            @if (trace.RootSpan != null)
-                                            {
-                                                var totalMs = trace.TotalDuration.TotalMilliseconds == 0 ? 1 : trace.TotalDuration.TotalMilliseconds;
-                                                @RenderFlamegraphNode(trace.RootSpan, totalMs, trace.StartTime, 0)
-                                            }
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    }
-                }
-            </tbody>
-        </table>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+            }
+        }
     </div>
 </div>
 
@@ -123,159 +134,408 @@
         gap: 1rem;
     }
     
+    .search-form {
+        display: flex;
+        gap: 0.5rem;
+        margin: 0;
+        align-items: center;
+    }
+    
+    .search-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    
+    .search-icon {
+        position: absolute;
+        left: 10px;
+        width: 18px;
+        height: 18px;
+        fill: var(--text-muted);
+        pointer-events: none;
+    }
+    
     .aspire-input {
         background: var(--item-bg);
         border: 1px solid var(--border-color);
         color: var(--text-main);
-        padding: 0.4rem 0.75rem;
-        border-radius: 4px;
+        padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+        border-radius: 6px;
         font-family: inherit;
         font-size: 0.9rem;
-        width: 250px;
+        width: 280px;
+        transition: border-color 0.15s, box-shadow 0.15s;
     }
     
     .aspire-input:focus {
         outline: none;
         border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
     }
     
     .aspire-btn {
         background: var(--item-bg);
         border: 1px solid var(--border-color);
         color: var(--text-main);
-        padding: 0.4rem 1rem;
-        border-radius: 4px;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
         cursor: pointer;
         font-size: 0.9rem;
         font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: background-color 0.15s, border-color 0.15s;
     }
     
     .aspire-btn:hover {
         background: var(--panel-bg-hover);
+        border-color: var(--border-hover);
     }
     
-    .aspire-btn-link {
-        background: none;
-        border: none;
-        color: var(--accent);
-        cursor: pointer;
-        font-weight: 500;
-        padding: 0;
+    .aspire-btn.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
     }
     
-    .aspire-btn-link:hover {
-        text-decoration: underline;
+    .aspire-btn.primary:hover {
+        opacity: 0.9;
     }
     
-    .empty-cell {
+    .refresh-btn {
+        text-decoration: none;
+    }
+    
+    .refresh-icon {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+    }
+    
+    .empty-state {
         text-align: center;
+        padding: 4rem 2rem;
+        background: var(--panel-bg);
+        border: 1px dashed var(--border-color);
+        border-radius: 8px;
         color: var(--text-muted);
-        padding: 3rem !important;
     }
     
-    .fw-semibold { font-weight: 600; }
-    .font-mono { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.85rem; }
-    .text-muted { color: var(--text-muted); font-size: 0.8rem; }
+    .empty-icon {
+        width: 48px;
+        height: 48px;
+        fill: var(--text-muted);
+        margin-bottom: 1rem;
+    }
     
-    .service-badge {
-        background: var(--panel-bg-hover);
+    .empty-state h3 {
+        margin: 0 0 0.5rem 0;
+        color: var(--text-main);
+        font-size: 1.2rem;
+    }
+    
+    .empty-state p {
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    .traces-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .trace-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    
+    .trace-card:hover {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border-color: var(--border-hover);
+    }
+    
+    .trace-summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        cursor: pointer;
+        user-select: none;
+        list-style: none;
+    }
+    
+    .trace-summary::-webkit-details-marker {
+        display: none;
+    }
+    
+    .trace-meta {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .trace-time {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+    }
+    
+    .trace-name-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .trace-method {
+        font-size: 0.75rem;
+        font-weight: 700;
         padding: 0.2rem 0.5rem;
         border-radius: 4px;
-        font-size: 0.85rem;
+        text-transform: uppercase;
+        font-family: 'Consolas', 'Courier New', monospace;
+        min-width: 48px;
+        text-align: center;
     }
     
-    .status-badge {
+    .trace-method.get { background: rgba(2, 132, 199, 0.1); color: #0284c7; }
+    .trace-method.post { background: rgba(22, 163, 74, 0.1); color: #16a34a; }
+    .trace-method.put { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+    .trace-method.delete { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+    .trace-method.other { background: var(--panel-bg-hover); color: var(--text-muted); }
+    
+    .trace-path {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--text-main);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .trace-service-badge {
+        font-size: 0.8rem;
+        background: var(--panel-bg-hover);
+        color: var(--text-muted);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+    
+    .trace-stats {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        margin-left: 1rem;
+    }
+    
+    .trace-duration-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+    
+    .trace-status-badge {
         font-size: 0.8rem;
         font-weight: 600;
         padding: 0.2rem 0.5rem;
         border-radius: 4px;
     }
     
-    .status-badge.success {
+    .trace-status-badge.success {
         background: var(--badge-success-bg);
         color: var(--badge-success-text);
     }
     
-    .status-badge.error {
+    .trace-status-badge.error {
         background: var(--badge-error-bg);
         color: var(--badge-error-text);
     }
     
-    .expanded-row td {
-        border-bottom: none !important;
-        background: var(--panel-bg-hover);
+    .chevron-icon {
+        width: 20px;
+        height: 20px;
+        fill: var(--text-muted);
+        transition: transform 0.2s ease-in-out;
     }
     
-    .details-row td {
-        padding: 0 !important;
-        background: var(--panel-bg-hover);
-        border-bottom: 2px solid var(--border-color) !important;
+    .trace-card[open] .chevron-icon {
+        transform: rotate(180deg);
+    }
+    
+    .trace-details-content {
+        padding: 1.25rem;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-color);
     }
     
     .waterfall-container {
-        padding: 1.5rem;
-        border-top: 1px solid var(--border-color);
+        padding: 0.5rem;
     }
     
-    .waterfall-container h5 {
+    .waterfall-container h4 {
         margin: 0 0 1rem 0;
         font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-main);
     }
     
-    .flamegraph-container {
+    .waterfall-tree {
         display: flex;
         flex-direction: column;
-        gap: 2px;
-        background: rgba(0, 0, 0, 0.02);
-        padding: 0.5rem;
-        border-radius: 4px;
-        border: 1px solid var(--border-color);
+        gap: 0.5rem;
     }
     
-    [data-theme="dark"] .flamegraph-container {
-        background: rgba(255, 255, 255, 0.02);
-    }
-
-    .flame-row {
+    .span-node {
         position: relative;
-        height: 24px;
-        width: 100%;
     }
-
-    .flame-bar {
-        position: absolute;
-        height: 100%;
-        background-color: var(--accent);
-        border-radius: 3px;
+    
+    .span-details-card {
+        background: var(--item-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        overflow: hidden;
+        transition: border-color 0.15s;
+    }
+    
+    .span-details-card:hover {
+        border-color: var(--border-hover);
+    }
+    
+    .span-summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        user-select: none;
+        list-style: none;
+    }
+    
+    .span-summary::-webkit-details-marker {
+        display: none;
+    }
+    
+    .span-summary-left {
         display: flex;
         align-items: center;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        padding: 0 6px;
-        color: #fff;
-        font-size: 0.75rem;
+        gap: 0.5rem;
         font-weight: 500;
-        cursor: default;
-        transition: opacity 0.2s;
+        font-size: 0.85rem;
+        min-width: 0;
+        flex: 1;
     }
-
-    .flame-bar:hover {
-        opacity: 0.85;
+    
+    .span-name {
+        color: var(--text-main);
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-
-    .flame-bar.error {
-        background-color: var(--badge-error-text);
+    
+    .span-service-badge {
+        font-size: 0.75rem;
+        background: var(--panel-bg-hover);
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+        color: var(--text-muted);
+        white-space: nowrap;
     }
-
-    .flame-label {
-        pointer-events: none;
+    
+    .span-summary-right {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        width: 45%;
+        margin-left: 1rem;
     }
-
-    .flame-service {
-        opacity: 0.8;
-        font-weight: normal;
-        margin-left: 4px;
+    
+    .span-duration {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        min-width: 65px;
+        text-align: right;
+        font-family: 'Consolas', 'Courier New', monospace;
+    }
+    
+    .span-timeline-outer {
+        flex: 1;
+        height: 10px;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 5px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    [data-theme="dark"] .span-timeline-outer {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .span-timeline-inner {
+        position: absolute;
+        height: 100%;
+        border-radius: 5px;
+        top: 0;
+    }
+    
+    .span-content {
+        padding: 0.75rem;
+        background: var(--panel-bg-hover);
+        border-top: 1px solid var(--border-color);
+        font-size: 0.8rem;
+    }
+    
+    .span-info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+    
+    .span-grid-full {
+        grid-column: span 2;
+    }
+    
+    .method-badge {
+        background: var(--badge-info-bg);
+        color: var(--badge-info-text);
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-family: 'Consolas', 'Courier New', monospace;
+    }
+    
+    .font-mono { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.85rem; }
+    .status-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.1rem 0.35rem;
+        border-radius: 4px;
+    }
+    .status-badge.success {
+        background: var(--badge-success-bg);
+        color: var(--badge-success-text);
+    }
+    .status-badge.error {
+        background: var(--badge-error-bg);
+        color: var(--badge-error-text);
     }
 </style>
 @code {
@@ -294,11 +554,67 @@
         var leftPct = (offsetMs / traceDurationMs) * 100;
         var widthPct = Math.Max((durationMs / traceDurationMs) * 100, 0.5);
 
-        <div class="flame-row">
-            <div class="flame-bar @(span.IsError ? "error" : "")" style="left: @leftPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%; width: @widthPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%;" title="@span.Name (@Math.Round(durationMs, 2) ms)">
-                <span class="flame-label">@span.Name <span class="flame-service">@span.ServiceName</span></span>
-            </div>
+        // Limit maximum left and width to avoid breaking layouts
+        if (leftPct < 0) leftPct = 0;
+        if (leftPct > 100) leftPct = 100;
+        if (leftPct + widthPct > 100) widthPct = 100 - leftPct;
+
+        // Custom color based on type
+        var barColor = "var(--accent)";
+        if (span.IsError)
+        {
+            barColor = "var(--badge-error-text)";
+        }
+        else if (span.Name.Contains("GET"))
+        {
+            barColor = "#0284c7";
+        }
+        else if (span.Name.Contains("POST"))
+        {
+            barColor = "#16a34a";
+        }
+        else if (span.Name.Contains("SELECT") || span.Name.Contains("db"))
+        {
+            barColor = "#7c3aed";
+        }
+
+        <div class="span-node" style="margin-left: @((depth * 16).ToString())px;">
+            <details class="span-details-card">
+                <summary class="span-summary">
+                    <div class="span-summary-left">
+                        <span class="span-name">@span.Name</span>
+                        <span class="span-service-badge">@span.ServiceName</span>
+                    </div>
+                    <div class="span-summary-right">
+                        <span class="span-duration">@(Math.Round(durationMs, 1).ToString()) ms</span>
+                        <div class="span-timeline-outer">
+                            <div class="span-timeline-inner" style="left: @leftPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%; width: @widthPct.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%; background: @barColor;"></div>
+                        </div>
+                    </div>
+                </summary>
+                <div class="span-content">
+                    <div class="span-info-grid">
+                        <div><strong>Span ID:</strong> <span class="font-mono">@span.SpanId</span></div>
+                        <div><strong>Parent Span ID:</strong> <span class="font-mono">@(string.IsNullOrEmpty(span.ParentSpanId) ? "None (Root)" : span.ParentSpanId)</span></div>
+                        @if (span.HttpStatusCode.HasValue)
+                        {
+                            <div><strong>HTTP Status:</strong> <span class="status-badge @(span.IsError ? "error" : "success")">@span.HttpStatusCode</span></div>
+                        }
+                        @if (!string.IsNullOrEmpty(span.HttpMethod))
+                        {
+                            <div><strong>HTTP Method:</strong> <span class="method-badge">@span.HttpMethod</span></div>
+                        }
+                        @if (!string.IsNullOrEmpty(span.UrlPath))
+                        {
+                            <div class="span-grid-full"><strong>URL Path:</strong> <span class="font-mono">@span.UrlPath</span></div>
+                        }
+                        <div><strong>Start Time:</strong> @span.StartTime.ToString("HH:mm:ss.fff")</div>
+                        <div><strong>Duration:</strong> @(Math.Round(durationMs, 3).ToString()) ms</div>
+                    </div>
+                </div>
+            </details>
         </div>
+
         @foreach (var child in span.Children.OrderBy(c => c.StartTime))
         {
             @RenderFlamegraphNode(child, traceDurationMs, traceStartTime, depth + 1)

@@ -3,7 +3,7 @@
 @using AppPipe.Hosting
 @using Microsoft.Extensions.Configuration
 @inject ITelemetryStore Store
-@inject AppPipeApp? AppTopology
+@inject AppPipeHostingApp? AppTopology
 @inject NavigationManager Nav
 @inject IConfiguration Config
 @implements IDisposable
@@ -87,7 +87,22 @@
                     foreach (var resource in AppTopology.Resources)
                     {
                         var isIIS = Environment.GetEnvironmentVariable("APP_POOL_ID") != null;
-                        var endpointUrl = isIIS ? Nav.ToAbsoluteUri(resource.Name).ToString() : $"http://localhost:{resource.AssignedPort}";
+                        string endpointUrl;
+                        if (isIIS)
+                        {
+                            var baseUriObj = new Uri(Nav.BaseUri);
+                            var baseIISUrl = $"{baseUriObj.Scheme}://{baseUriObj.Authority}";
+                            var appPath = resource.AppPath ?? $"/{resource.Name}";
+                            if (!appPath.StartsWith("/"))
+                            {
+                                appPath = "/" + appPath;
+                            }
+                            endpointUrl = $"{baseIISUrl}{appPath}";
+                        }
+                        else
+                        {
+                            endpointUrl = $"http://localhost:{resource.AssignedPort}";
+                        }
                         
                         <tr>
                             <td class="fw-semibold">@resource.Name</td>

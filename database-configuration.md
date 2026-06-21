@@ -106,14 +106,14 @@ public class SqliteTelemetryStore : ITelemetryStore
 
 ### 2. Register the Custom Store in your Orchestrator
 
-Register your custom database store with the `AppPipeAppBuilder` during startup. Use the fluent `ConfigureGateway` method to override the default in-memory registration:
+Register your custom database store with the `AppPipeHostingAppBuilder` during startup. Use the fluent `ConfigureGateway` method to override the default in-memory registration:
 
 ```csharp
 using AppPipe.Hosting;
 using AppPipe.Gateway.Services;
 using Microsoft.Extensions.DependencyInjection;
 
-var builder = AppPipeApp.CreateBuilder(args);
+var builder = AppPipeHostingApp.CreateBuilder(args);
 
 // Register custom Telemetry Store on the Gateway's DI container:
 builder.ConfigureGateway(gatewayBuilder =>
@@ -134,7 +134,7 @@ if (args.Length > 0 && args[0] == "deploy")
 }
 else if (Environment.GetEnvironmentVariable("APP_POOL_ID") != null)
 {
-    var gateway = new GatewayHost();
+    var gateway = new GatewayAppPipeHost();
     await gateway.StartAsync(string.Empty, app, app.ConfigureGatewayAction);
     await Task.Delay(-1);
 }

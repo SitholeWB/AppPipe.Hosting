@@ -26,7 +26,7 @@ public class DeploymentOptions
 
 public class OnPremDeployer
 {
-    public static async Task CompileToOnPremAsync(AppPipeApp app, DeploymentTarget target = DeploymentTarget.IIS, string path = "")
+    public static async Task CompileToOnPremAsync(AppPipeHostingApp app, DeploymentTarget target = DeploymentTarget.IIS, string path = "")
     {
         Console.WriteLine($"Starting AppPipe ModularPipelines Deployment targeting {target}...");
         

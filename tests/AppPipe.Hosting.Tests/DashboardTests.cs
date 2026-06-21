@@ -11,14 +11,14 @@ public class DashboardTests
     [Fact]
     public async Task Dashboard_EndpointsShouldReturnSuccess()
     {
-        // 1. Arrange: Create topology and GatewayHost
-        var builder = AppPipeApp.CreateBuilder(null!);
-        var hostProject = new ProjectResource("AppPipe.DevHost", "");
+        // 1. Arrange: Create topology and GatewayAppPipeHost
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
+        var hostProject = new AppPipeHostingProjectResource("AppPipe.DevHost", "");
         hostProject.WithEndpoint(0);
         builder.HostProject = hostProject;
         var app = builder.Build();
 
-        var gatewayHost = new GatewayHost();
+        var gatewayHost = new GatewayAppPipeHost();
         var ports = await gatewayHost.StartAsync(string.Empty, app);
 
         using var httpClient = new HttpClient();

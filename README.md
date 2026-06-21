@@ -81,23 +81,23 @@ Configure your services and their relationships in your entry point:
 ```csharp
 using AppPipe.Hosting;
 
-var builder = AppPipeApp.CreateBuilder(args);
+var builder = AppPipeHostingApp.CreateBuilder(args);
 
 // Define a backend worker microservice using compile-safe generated constant
-var backend = builder.AddProject(Projects.BackendWorker);
+var backend = builder.AddProject(AppPipeProjects.BackendWorker);
 
 // Or register directly using raw string name:
 // var backend = builder.AddProject("BackendWorker");
 
 // Define a frontend API that communicates with the backend
-var frontend = builder.AddProject(Projects.FrontendApi)
+var frontend = builder.AddProject(AppPipeProjects.FrontendApi)
                       .WithReference(backend); // Injects service discovery variables automatically
 
 
 var app = builder.Build();
 
-// Run the host using DevHostRunner
-var runner = new DevHostRunner(app);
+// Run the host using AppPipeDevHostRunner
+var runner = new AppPipeDevHostRunner(app);
 await runner.RunAsync();
 ```
 
@@ -175,11 +175,11 @@ var backend = builder.AddProject("BackendWorker")
 ```
 
 ### 2. Customizing the Dashboard (Host Project)
-The dashboard itself is represented as `builder.HostProject` (an instance of `ProjectResource`) and can be named and configured just like any other microservice:
+The dashboard itself is represented as `builder.HostProject` (an instance of `AppPipeHostingProjectResource`) and can be named and configured just like any other microservice:
 
 ```csharp
 // Set a custom dashboard application name (used for SCM Service name)
-builder.HostProject = new ProjectResource("AppPipeDashboard", "");
+builder.HostProject = new AppPipeHostingProjectResource("AppPipeDashboard", "");
 
 // Configure the dashboard options fluently
 builder.HostProject.WithEndpoint(7001)

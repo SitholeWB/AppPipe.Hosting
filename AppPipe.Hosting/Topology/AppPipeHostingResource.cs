@@ -1,12 +1,12 @@
 namespace AppPipe.Hosting;
 
-public abstract class AppResource
+public abstract class AppPipeHostingResource
 {
     public string Name { get; }
     public int AssignedPort { get; set; }
-    public List<AppResource> References { get; } = new List<AppResource>();
+    public List<AppPipeHostingResource> References { get; } = new List<AppPipeHostingResource>();
     public Dictionary<string, string> EnvironmentVariables { get; } = new Dictionary<string, string>();
-    public List<AppResource> WaitDependencies { get; } = new List<AppResource>();
+    public List<AppPipeHostingResource> WaitDependencies { get; } = new List<AppPipeHostingResource>();
 
     // Customizable Deployment Configurations
     public string? AppPoolName { get; set; }
@@ -20,12 +20,12 @@ public abstract class AppResource
     public string? ServicePassword { get; set; }
     public string? HostingModel { get; set; }
 
-    protected AppResource(string name)
+    protected AppPipeHostingResource(string name)
     {
         Name = name;
     }
 
-    public AppResource WithReference(AppResource reference)
+    public AppPipeHostingResource WithReference(AppPipeHostingResource reference)
     {
         if (reference != null && !References.Contains(reference))
         {
@@ -34,19 +34,19 @@ public abstract class AppResource
         return this;
     }
 
-    public AppResource WithEndpoint(int port)
+    public AppPipeHostingResource WithEndpoint(int port)
     {
         AssignedPort = port;
         return this;
     }
 
-    public AppResource WithEnvironment(string name, string value)
+    public AppPipeHostingResource WithEnvironment(string name, string value)
     {
         EnvironmentVariables[name] = value;
         return this;
     }
 
-    public AppResource WaitFor(AppResource dependency)
+    public AppPipeHostingResource WaitFor(AppPipeHostingResource dependency)
     {
         if (dependency != null && !WaitDependencies.Contains(dependency))
         {
@@ -55,55 +55,55 @@ public abstract class AppResource
         return this;
     }
 
-    public AppResource WithAppPool(string appPoolName)
+    public AppPipeHostingResource WithAppPool(string appPoolName)
     {
         AppPoolName = appPoolName;
         return this;
     }
 
-    public AppResource WithIISSite(string siteName)
+    public AppPipeHostingResource WithIISSite(string siteName)
     {
         IISSiteName = siteName;
         return this;
     }
 
-    public AppResource WithServiceDisplayName(string displayName)
+    public AppPipeHostingResource WithServiceDisplayName(string displayName)
     {
         ServiceDisplayName = displayName;
         return this;
     }
 
-    public AppResource WithServiceDescription(string description)
+    public AppPipeHostingResource WithServiceDescription(string description)
     {
         ServiceDescription = description;
         return this;
     }
 
-    public AppResource WithServiceStartType(string startType)
+    public AppPipeHostingResource WithServiceStartType(string startType)
     {
         ServiceStartType = startType;
         return this;
     }
 
-    public AppResource WithServiceAccount(string account)
+    public AppPipeHostingResource WithServiceAccount(string account)
     {
         ServiceAccount = account;
         return this;
     }
 
-    public AppResource WithHostingModel(string hostingModel)
+    public AppPipeHostingResource WithHostingModel(string hostingModel)
     {
         HostingModel = hostingModel;
         return this;
     }
 
-    public AppResource WithServicePassword(string password)
+    public AppPipeHostingResource WithServicePassword(string password)
     {
         ServicePassword = password;
         return this;
     }
 
-    public AppResource WithAppPath(string path)
+    public AppPipeHostingResource WithAppPath(string path)
     {
         if (string.IsNullOrEmpty(path) || path == "/")
         {
