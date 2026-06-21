@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\AppPipe.Hosting\AppPipe.Hosting.csproj" />
+    <ProjectReference Include="..\BackendWorker\BackendWorker.csproj" />
+    <ProjectReference Include="..\FrontendApi\FrontendApi.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -10,5 +12,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <Import Project="..\..\AppPipe.Hosting\build\AppPipe.Hosting.targets" />
 
 </Project>

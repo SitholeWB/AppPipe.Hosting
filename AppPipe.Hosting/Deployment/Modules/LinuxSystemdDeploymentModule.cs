@@ -167,7 +167,10 @@ WantedBy=multi-user.target
             // Route for Gateway/Dashboard
             if (_app.HostProject != null)
             {
-                nginxConfig.AppendLine("    location / {");
+                var customPath = _app.HostProject.AppPath;
+                var locationPath = (string.IsNullOrEmpty(customPath) || customPath == "/") ? "/" : "/" + customPath.Trim('/') + "/";
+
+                nginxConfig.AppendLine($"    location {locationPath} {{");
                 nginxConfig.AppendLine($"        proxy_pass http://localhost:{_app.HostProject.AssignedPort};");
                 nginxConfig.AppendLine("        proxy_http_version 1.1;");
                 nginxConfig.AppendLine("        proxy_set_header Upgrade $http_upgrade;");
@@ -185,7 +188,20 @@ WantedBy=multi-user.target
             {
                 if (resource is ProjectResource project)
                 {
-                    var paths = new[] { $"/{project.Name}/", $"/{project.Name.ToLower()}/" };
+                    var customPath = project.AppPath;
+                    var paths = new List<string>();
+
+                    if (!string.IsNullOrEmpty(customPath) && customPath != "/")
+                    {
+                        var trimmed = customPath.Trim('/');
+                        paths.Add($"/{trimmed}/");
+                    }
+                    else if (customPath != "/")
+                    {
+                        paths.Add($"/{project.Name}/");
+                        paths.Add($"/{project.Name.ToLower()}/");
+                    }
+
                     foreach (var path in paths)
                     {
                         nginxConfig.AppendLine($"    location {path} {{");
@@ -251,8 +267,20 @@ WantedBy=multi-user.target
             {
                 if (resource is ProjectResource project)
                 {
-                    var names = new[] { project.Name, project.Name.ToLower() };
-                    foreach (var name in names)
+                    var customPath = project.AppPath;
+                    var paths = new List<string>();
+
+                    if (!string.IsNullOrEmpty(customPath) && customPath != "/")
+                    {
+                        paths.Add(customPath.Trim('/'));
+                    }
+                    else if (customPath != "/")
+                    {
+                        paths.Add(project.Name);
+                        paths.Add(project.Name.ToLower());
+                    }
+
+                    foreach (var name in paths)
                     {
                         caddyConfig.AppendLine($"    handle_path /{name}/* {{");
                         caddyConfig.AppendLine($"        reverse_proxy localhost:{project.AssignedPort}");
@@ -264,7 +292,10 @@ WantedBy=multi-user.target
             // Route for Gateway/Dashboard (fallback)
             if (_app.HostProject != null)
             {
-                caddyConfig.AppendLine("    handle /* {");
+                var customPath = _app.HostProject.AppPath;
+                var handlePath = (string.IsNullOrEmpty(customPath) || customPath == "/") ? "/*" : "/" + customPath.Trim('/') + "/*";
+
+                caddyConfig.AppendLine($"    handle {handlePath} {{");
                 caddyConfig.AppendLine($"        reverse_proxy localhost:{_app.HostProject.AssignedPort}");
                 caddyConfig.AppendLine("    }");
             }

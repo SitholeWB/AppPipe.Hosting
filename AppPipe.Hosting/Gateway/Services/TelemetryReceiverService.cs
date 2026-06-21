@@ -1,10 +1,9 @@
-using System.Threading.Tasks;
 using Grpc.Core;
-using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Collector.Logs.V1;
 using OpenTelemetry.Proto.Collector.Metrics.V1;
+using OpenTelemetry.Proto.Collector.Trace.V1;
 
-namespace AppPipe.Gateway.Services;
+namespace AppPipe.Hosting;
 
 public class TraceReceiverService : TraceService.TraceServiceBase
 {

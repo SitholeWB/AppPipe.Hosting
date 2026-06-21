@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace AppPipe.Hosting;
 
 public abstract class AppResource
@@ -12,7 +10,9 @@ public abstract class AppResource
 
     // Customizable Deployment Configurations
     public string? AppPoolName { get; set; }
+
     public string IISSiteName { get; set; } = "Default Web Site";
+    public string? AppPath { get; set; }
     public string? ServiceDisplayName { get; set; }
     public string? ServiceDescription { get; set; }
     public string ServiceStartType { get; set; } = "auto";
@@ -100,6 +100,19 @@ public abstract class AppResource
     public AppResource WithServicePassword(string password)
     {
         ServicePassword = password;
+        return this;
+    }
+
+    public AppResource WithAppPath(string path)
+    {
+        if (string.IsNullOrEmpty(path) || path == "/")
+        {
+            AppPath = "/";
+        }
+        else
+        {
+            AppPath = path.StartsWith("/") ? path : "/" + path;
+        }
         return this;
     }
 }

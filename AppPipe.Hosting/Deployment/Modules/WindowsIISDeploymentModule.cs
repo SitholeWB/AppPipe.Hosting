@@ -56,7 +56,14 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
 
         if (_app.HostProject != null)
         {
-            var hostAppPath = string.IsNullOrEmpty(basePath) ? $"/{_app.HostProject.Name}" : basePath;
+            var hostAppPath = _app.HostProject.AppPath ?? (string.IsNullOrEmpty(basePath) ? $"/{_app.HostProject.Name}" : basePath);
+            if (hostAppPath == "" || hostAppPath == "/")
+                hostAppPath = "/";
+            else
+            {
+                hostAppPath = hostAppPath.StartsWith("/") ? hostAppPath : "/" + hostAppPath;
+                hostAppPath = hostAppPath.Replace("//", "/");
+            }
             var envVars = new Dictionary<string, string>
             {
                 { "TELEMETRY_PORT", telemetryPort.ToString() }
@@ -69,7 +76,15 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
         {
             if (resource is ProjectResource project)
             {
-                var appPath = $"{basePath}/{project.Name}";
+                var appPath = project.AppPath ?? $"{basePath}/{project.Name}";
+                if (appPath == "" || appPath == "/")
+                    appPath = "/";
+                else
+                {
+                    appPath = appPath.StartsWith("/") ? appPath : "/" + appPath;
+                    appPath = appPath.Replace("//", "/");
+                }
+
                 var envVars = new Dictionary<string, string>();
                 envVars["OTEL_EXPORTER_OTLP_ENDPOINT"] = $"http://localhost:{telemetryPort}";
                 
@@ -78,7 +93,17 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
                 
                 foreach (var reference in project.References)
                 {
-                    envVars[$"services__{reference.Name}__http__0"] = $"http://localhost{basePath}/{reference.Name}/";
+                    var refAppPath = reference.AppPath ?? $"{basePath}/{reference.Name}";
+                    if (refAppPath == "" || refAppPath == "/")
+                        refAppPath = "/";
+                    else
+                    {
+                        refAppPath = "/" + refAppPath.TrimStart('/');
+                        if (!refAppPath.EndsWith("/"))
+                            refAppPath += "/";
+                        refAppPath = refAppPath.Replace("//", "/");
+                    }
+                    envVars[$"services__{reference.Name}__http__0"] = $"http://localhost{refAppPath}";
                 }
 
                 await DeployProjectToIIS(context, project, appPath, appCmdPath, cancellationToken, results, envVars, false);
@@ -195,28 +220,53 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
                 catch (Exception ex) { context.Logger.LogWarning($"Failed to set AppPool identity: {ex.Message}"); }
             }
 
-            try
+            if (appPath == "/")
             {
-                // Delete existing App if it exists, to update the physical path/pool cleanly
-                await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                try
                 {
-                    Arguments = new[] { "delete", "app", $"{siteName}{appPath}" }
-                }, cancellationToken);
-            }
-            catch (Exception) { /* Ignore if it doesn't exist */ }
+                    // For root app, set the app pool and physical path on the default site root application
+                    var poolResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                    {
+                        Arguments = new[] { "set", "app", $"{siteName}/", $"/applicationPool:{appPoolName}" }
+                    }, cancellationToken);
+                    results.Add(poolResult);
 
-            try
-            {
-                // Create App under configured Site
-                var siteResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                    var pathResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                    {
+                        Arguments = new[] { "set", "vdir", $"{siteName}/", $"/physicalPath:{publishPath}" }
+                    }, cancellationToken);
+                    results.Add(pathResult);
+                }
+                catch (Exception ex)
                 {
-                    Arguments = new[] { "add", "app", $"/site.name:{siteName}", $"/path:{appPath}", $"/physicalPath:{publishPath}", $"/applicationPool:{appPoolName}" }
-                }, cancellationToken);
-                results.Add(siteResult);
+                    context.Logger.LogError($"Failed to configure IIS root app: {ex.Message}");
+                }
             }
-            catch (Exception ex)
+            else
             {
-                context.Logger.LogError($"Failed to create IIS app: {ex.Message}");
+                try
+                {
+                    // Delete existing App if it exists, to update the physical path/pool cleanly
+                    await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                    {
+                        Arguments = new[] { "delete", "app", $"{siteName}{appPath}" }
+                    }, cancellationToken);
+                }
+                catch (Exception) { /* Ignore if it doesn't exist */ }
+
+                try
+                {
+                    // Create App under configured Site
+                    var siteResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                    {
+                        Arguments = new[] { "add", "app", $"/site.name:{siteName}", $"/path:{appPath}", $"/physicalPath:{publishPath}", $"/applicationPool:{appPoolName}" }
+                    }, cancellationToken);
+                    results.Add(siteResult);
+                }
+                catch (Exception ex)
+                {
+                    context.Logger.LogError($"Failed to create IIS app: {ex.Message}");
+                }
             }
         }
         catch (Exception ex)

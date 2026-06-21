@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace AppPipe.Hosting;
 
 public class ProjectResource : AppResource

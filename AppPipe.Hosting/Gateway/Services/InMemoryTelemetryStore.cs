@@ -1,24 +1,20 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using OpenTelemetry.Proto.Collector.Trace.V1;
 using OpenTelemetry.Proto.Collector.Logs.V1;
 using OpenTelemetry.Proto.Collector.Metrics.V1;
-using OpenTelemetry.Proto.Common.V1;
+using OpenTelemetry.Proto.Collector.Trace.V1;
+using System.Collections.Concurrent;
 
-namespace AppPipe.Gateway.Services;
+namespace AppPipe.Hosting;
 
 public class InMemoryTelemetryStore : ITelemetryStore
 {
     private const int MaxItems = 200;
-    
+
     public ConcurrentDictionary<string, ParsedTrace> Traces { get; } = new();
     private ConcurrentQueue<string> _traceIds = new();
-    
+
     public ConcurrentQueue<ParsedLog> Logs { get; } = new();
     public ConcurrentQueue<ExportMetricsServiceRequest> Metrics { get; } = new();
-    
+
     public void AddTrace(ExportTraceServiceRequest request)
     {
         bool newTraceAdded = false;
@@ -35,13 +31,13 @@ public class InMemoryTelemetryStore : ITelemetryStore
                     var traceId = span.TraceId.ToBase64();
                     var spanId = span.SpanId.ToBase64();
                     var parentSpanId = span.ParentSpanId.IsEmpty ? "" : span.ParentSpanId.ToBase64();
-                    
+
                     var startTime = DateTimeOffset.FromUnixTimeMilliseconds((long)(span.StartTimeUnixNano / 1_000_000));
                     var endTime = DateTimeOffset.FromUnixTimeMilliseconds((long)(span.EndTimeUnixNano / 1_000_000));
-                    
+
                     var httpMethod = span.Attributes.FirstOrDefault(a => a.Key == "http.method" || a.Key == "http.request.method")?.Value.StringValue;
                     var urlPath = span.Attributes.FirstOrDefault(a => a.Key == "http.target" || a.Key == "url.path")?.Value.StringValue;
-                    
+
                     var statusCodeAttr = span.Attributes.FirstOrDefault(a => a.Key == "http.status_code" || a.Key == "http.response.status_code");
                     int? statusCode = statusCodeAttr != null ? (int)statusCodeAttr.Value.IntValue : null;
 
@@ -63,11 +59,11 @@ public class InMemoryTelemetryStore : ITelemetryStore
                     );
 
                     Traces.AddOrUpdate(traceId,
-                        (id) => 
+                        (id) =>
                         {
                             newTraceAdded = true;
                             _traceIds.Enqueue(id);
-                            
+
                             var trace = new ParsedTrace(id, startTime, TimeSpan.Zero, null, new List<ParsedSpan> { parsedSpan }, isError);
                             return RecomputeTrace(trace);
                         },
@@ -75,8 +71,8 @@ public class InMemoryTelemetryStore : ITelemetryStore
                         {
                             var updatedSpans = existingTrace.AllSpans.ToList();
                             updatedSpans.Add(parsedSpan);
-                            var trace = existingTrace with 
-                            { 
+                            var trace = existingTrace with
+                            {
                                 AllSpans = updatedSpans,
                                 HasError = existingTrace.HasError || isError,
                                 StartTime = startTime < existingTrace.StartTime ? startTime : existingTrace.StartTime
@@ -94,13 +90,13 @@ public class InMemoryTelemetryStore : ITelemetryStore
 
         OnTelemetryReceived?.Invoke();
     }
-    
+
     private ParsedTrace RecomputeTrace(ParsedTrace trace)
     {
         if (trace.AllSpans.Count == 0) return trace;
-        
+
         var spanDict = trace.AllSpans.ToDictionary(s => s.SpanId, s => s with { Children = new List<ParsedSpan>() });
-        
+
         foreach (var span in spanDict.Values)
         {
             if (!string.IsNullOrEmpty(span.ParentSpanId) && spanDict.TryGetValue(span.ParentSpanId, out var parent))
@@ -108,13 +104,13 @@ public class InMemoryTelemetryStore : ITelemetryStore
                 parent.Children.Add(span);
             }
         }
-        
+
         var allNewSpans = spanDict.Values.ToList();
         var root = allNewSpans.FirstOrDefault(s => string.IsNullOrEmpty(s.ParentSpanId) || !spanDict.ContainsKey(s.ParentSpanId));
-        
+
         var minTime = allNewSpans.Min(s => s.StartTime);
         var maxTime = allNewSpans.Max(s => s.EndTime);
-        
+
         return trace with { RootSpan = root ?? allNewSpans.First(), AllSpans = allNewSpans, StartTime = minTime, TotalDuration = maxTime - minTime };
     }
 
@@ -132,7 +128,7 @@ public class InMemoryTelemetryStore : ITelemetryStore
                     var timestamp = DateTimeOffset.FromUnixTimeMilliseconds((long)(logRecord.TimeUnixNano / 1_000_000));
                     var traceId = logRecord.TraceId.IsEmpty ? null : logRecord.TraceId.ToBase64();
                     var spanId = logRecord.SpanId.IsEmpty ? null : logRecord.SpanId.ToBase64();
-                    
+
                     var attributes = new Dictionary<string, string>();
                     foreach (var attr in logRecord.Attributes)
                     {
@@ -161,16 +157,16 @@ public class InMemoryTelemetryStore : ITelemetryStore
         }
 
         while (Logs.Count > MaxItems) Logs.TryDequeue(out _);
-        
+
         OnTelemetryReceived?.Invoke();
     }
-    
+
     public void AddMetric(ExportMetricsServiceRequest metric)
     {
         Metrics.Enqueue(metric);
         if (Metrics.Count > MaxItems) Metrics.TryDequeue(out _);
         OnTelemetryReceived?.Invoke();
     }
-    
+
     public event Action? OnTelemetryReceived;
 }

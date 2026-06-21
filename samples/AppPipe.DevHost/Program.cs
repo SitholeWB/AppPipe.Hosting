@@ -3,11 +3,9 @@ using AppPipe.Hosting;
 namespace AppPipe.DevHost;
 
 // ----------------------------------------------------------------------------------------- SAMPLE
-// APP: AppPipe.DevHost (The Orchestrator)
-//
-// This is the developer entry point. It defines the architecture (topology) of the application and
-// boots all the microservices concurrently. It dynamically injects configuration so services can
-// discover each other. -----------------------------------------------------------------------------------------
+// APP: AppPipe.DevHost (The Orchestrator) // This is the developer entry point. It defines the
+// architecture (topology) of the application and boots all the microservices concurrently. It
+// dynamically injects configuration so services can discover each other. -----------------------------------------------------------------------------------------
 
 internal class Program
 {
@@ -17,32 +15,34 @@ internal class Program
         var builder = AppPipeApp.CreateBuilder(args);
 
         // Initialize the HostProject explicitly without adding it to the child projects list
-        builder.HostProject = new AppPipe.Hosting.ProjectResource("AppPipe.DevHost", "");
+        builder.HostProject = new ProjectResource("AppPipe.DevHost", "");
         // We can't use AddProject("AppPipe.DevHost") because it adds it to the child project list
         // to be executed.
 
         // Configure the dashboard to explicitly use port 7001
         builder.HostProject.WithEndpoint(7001)
+                           .WithAppPath("/AppPipe.DevHost")
                            .WithEnvironment("LOG_LEVEL", "Debug");
 
-        // Add the internal backend service
-        //Or builder.AddProject<BackendWorker.Program>()
-        var backend = builder.AddProject("BackendWorker")
+        // Add the internal backend service using compile-safe project names
+        var backend = builder.AddProject(Projects.BackendWorker)
                              .WithEndpoint(7002)
                              .WithEnvironment("LOG_LEVEL", "Debug")
                              .WithAppPool("CustomBackendPool")
                              .WithIISSite("Default Web Site")
+                             .WithAppPath("/BackendWorker")
                              .WithServiceDisplayName("AppPipe Backend Worker Service")
                              .WithServiceDescription("AppPipe backend processing service runs tasks and telemetries.")
                              .WithServiceStartType("auto");
 
         // Add the public frontend API and tell the orchestrator it depends on the backend
-        var frontend = builder.AddProject("FrontendApi")
+        var frontend = builder.AddProject(Projects.FrontendApi)
                               .WithReference(backend)
                               .WithEndpoint(7003)
                               .WithEnvironment("LOG_LEVEL", "Debug")
                               .WithAppPool("CustomFrontendPool")
                               .WithIISSite("Default Web Site")
+                              .WithAppPath("/FrontendApi")
                               .WithServiceDisplayName("AppPipe Frontend API Service")
                               .WithServiceDescription("AppPipe public API gateway and web request handler.")
                               .WithServiceStartType("auto");
@@ -102,11 +102,12 @@ internal class Program
             Console.WriteLine("Deployment not supported on this framework.");
 #endif
         }
-        else if (Environment.GetEnvironmentVariable("APP_POOL_ID") != null || 
+        else if (Environment.GetEnvironmentVariable("APP_POOL_ID") != null ||
                  Environment.GetEnvironmentVariable("WINDOWS_SERVICE") == "true" ||
                  Environment.GetEnvironmentVariable("LINUX_SERVICE") == "true")
         {
-            // We are deployed inside IIS, Windows Service, or Linux systemd Service. Run the Dashboard/Gateway only.
+            // We are deployed inside IIS, Windows Service, or Linux systemd Service. Run the
+            // Dashboard/Gateway only.
             var gateway = new AppPipe.Hosting.GatewayHost();
             await gateway.StartAsync(string.Empty, app, app.ConfigureGatewayAction);
             await Task.Delay(-1);

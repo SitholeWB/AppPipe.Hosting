@@ -1,0 +1,45 @@
+<Project>
+  <Target Name="ConfigureAppPipeProjectReferences" BeforeTargets="ResolveProjectReferences;BeforeBuild">
+    <ItemGroup>
+      <!-- Automatically inject decoupling metadata to ProjectReference items unless they explicitly opt out via AppProject="false" -->
+      <!-- We also skip AppPipe.Hosting.csproj itself -->
+      <ProjectReference Condition="!$([System.String]::new('%(Identity)').Contains('AppPipe.Hosting.csproj')) and '%(ProjectReference.AppProject)' != 'false'">
+        <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+        <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+        <Private>false</Private>
+      </ProjectReference>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="GenerateAppPipeProjectConstants" BeforeTargets="BeforeCompile;CoreCompile">
+    <PropertyGroup>
+      <GeneratedProjectsFile>$(IntermediateOutputPath)AppPipe.Projects.g.cs</GeneratedProjectsFile>
+    </PropertyGroup>
+    
+    <ItemGroup>
+      <!-- Filter out the AppPipe.Hosting library reference itself and any project references that opted out of AppProject -->
+      <FilteredProjectReference Include="@(ProjectReference)" Condition="!$([System.String]::new('%(Identity)').Contains('AppPipe.Hosting.csproj')) and '%(ProjectReference.AppProject)' != 'false'" />
+      <ProjectReferenceNames Include="@(FilteredProjectReference->'%(Filename)')" />
+    </ItemGroup>
+
+    <!-- Create code lines -->
+    <ItemGroup>
+      <CodeLines Include="// &lt;auto-generated /&gt;" />
+      <CodeLines Include="namespace AppPipe.Hosting" />
+      <CodeLines Include="{" />
+      <CodeLines Include="    public static class Projects" />
+      <CodeLines Include="    {" />
+      <CodeLines Include="        public const string %(ProjectReferenceNames.Identity) = &quot;%(ProjectReferenceNames.Identity)&quot;%3B" />
+      <CodeLines Include="    }" />
+      <CodeLines Include="}" />
+    </ItemGroup>
+
+    <!-- Write code lines to the intermediate directory file, overwriting the old one -->
+    <WriteLinesToFile File="$(GeneratedProjectsFile)" Lines="@(CodeLines)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    
+    <ItemGroup>
+      <!-- Include the generated file in the compilation dynamically -->
+      <Compile Include="$(GeneratedProjectsFile)" />
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,14 +1,9 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using AppPipe.Gateway.Services;
 
 namespace AppPipe.Hosting;
 
@@ -42,7 +37,7 @@ public class GatewayHost
                 // Dashboard / YARP (HTTP/1.1 and HTTP/2)
                 options.Listen(System.Net.IPAddress.Loopback, dashboardPort, o => o.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2);
             }
-            
+
             if (!isIIS || telemetryPort != 0)
             {
                 // Telemetry (Strict HTTP/2 for unencrypted gRPC)
@@ -61,16 +56,16 @@ public class GatewayHost
         builder.Services.AddWindowsService();
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
-            
+
         builder.Services.Insert(0, ServiceDescriptor.Transient<IStartupFilter, TelemetryPortTokenRemoverFilter>());
 
         builder.Services.AddGrpc();
-        
+
         if (configureBuilder != null)
         {
             configureBuilder(builder);
         }
-        
+
         // If consumer didn't register ITelemetryStore, register default
         if (!builder.Services.Any(x => x.ServiceType == typeof(ITelemetryStore)))
         {
@@ -95,7 +90,7 @@ public class GatewayHost
         }
 
         _app.UseAntiforgery();
-        
+
         if (configureApp != null)
         {
             configureApp(_app);
@@ -104,7 +99,8 @@ public class GatewayHost
         _app.UseStaticFiles();
         _app.MapStaticAssets();
 
-        _app.MapGet("/debug-env", (IWebHostEnvironment env) => new {
+        _app.MapGet("/debug-env", (IWebHostEnvironment env) => new
+        {
             env.ApplicationName,
             env.ContentRootPath,
             env.WebRootPath,
@@ -132,13 +128,13 @@ public class GatewayHost
 
         var serverAddresses = _app.Services.GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>().Features.Get<IServerAddressesFeature>();
         var addresses = serverAddresses?.Addresses.ToList();
-        
+
         if (addresses == null || addresses.Count < 2)
             throw new Exception("Failed to bind Gateway to dynamic ports.");
 
         var actualDashboardPort = new Uri(addresses[0]).Port;
         var actualTelemetryPort = new Uri(addresses[1]).Port;
-        
+
         if (topology?.HostProject != null)
         {
             topology.HostProject.AssignedPort = actualDashboardPort;
@@ -167,9 +163,10 @@ public class TelemetryPortTokenRemoverFilter : IStartupFilter
                 var tpEnv = Environment.GetEnvironmentVariable("TELEMETRY_PORT");
                 if (int.TryParse(tpEnv, out var tp) && context.Connection.LocalPort == tp)
                 {
-                    // IISIntegrationMiddleware will reject ALL loopback requests if MS-ASPNETCORE-TOKEN is missing or wrong.
-                    // Since OTLP comes directly to localhost from other processes, it's a loopback request but not from ANCM.
-                    // We must provide the correct token so IISIntegrationMiddleware allows it.
+                    // IISIntegrationMiddleware will reject ALL loopback requests if
+                    // MS-ASPNETCORE-TOKEN is missing or wrong. Since OTLP comes directly to
+                    // localhost from other processes, it's a loopback request but not from ANCM. We
+                    // must provide the correct token so IISIntegrationMiddleware allows it.
                     var expectedToken = Environment.GetEnvironmentVariable("ASPNETCORE_TOKEN");
                     if (!string.IsNullOrEmpty(expectedToken))
                     {

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using AppPipe.Hosting;
-
 namespace AppPipe.Hosting;
 
 public class AppPipeAppBuilder
@@ -22,7 +18,7 @@ public class AppPipeAppBuilder
         // Search up from AppContext.BaseDirectory to find the .sln or .slnx
         var currentDir = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
         string projectPath = string.Empty;
-        
+
         while (currentDir != null)
         {
             if (currentDir.GetFiles("*.sln").Length > 0 || currentDir.GetFiles("*.slnx").Length > 0 || currentDir.GetDirectories("samples").Length > 0)
@@ -37,7 +33,7 @@ public class AppPipeAppBuilder
             }
             currentDir = currentDir.Parent;
         }
-        
+
         if (string.IsNullOrEmpty(projectPath))
         {
             throw new Exception($"Could not find project file for {name}");

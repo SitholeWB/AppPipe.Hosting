@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading.Tasks;
-using AppPipe.Hosting;
 
 namespace AppPipe.Hosting;
 
@@ -26,7 +22,7 @@ public class DevHostRunner
         yarpConfig.AppendLine("{ \"ReverseProxy\": { \"Routes\": {");
         var routes = new List<string>();
         var clusters = new List<string>();
-        
+
         foreach (var p in _app.Resources)
         {
             if (p.AssignedPort == 0)
@@ -41,7 +37,7 @@ public class DevHostRunner
         yarpConfig.AppendLine("}, \"Clusters\": {");
         yarpConfig.AppendLine(string.Join(",", clusters));
         yarpConfig.AppendLine("} } }");
-        
+
         var yarpConfigFile = System.IO.Path.GetFullPath("yarp.json");
         System.IO.File.WriteAllText(yarpConfigFile, yarpConfig.ToString());
 
@@ -73,7 +69,7 @@ public class DevHostRunner
         }
 
         var envVars = new Dictionary<string, string>();
-        
+
         // Inject loopback ports
         envVars["ASPNETCORE_URLS"] = $"http://localhost:{resource.AssignedPort}";
         envVars["PORT"] = resource.AssignedPort.ToString(); // For Node.js/Executables
@@ -94,7 +90,7 @@ public class DevHostRunner
         }
 
         Console.WriteLine($"Starting {resource.Name} on port {resource.AssignedPort}...");
-        
+
         var startInfo = new ProcessStartInfo
         {
             UseShellExecute = false,
@@ -129,12 +125,14 @@ public class DevHostRunner
         startInfo.EnvironmentVariables.Remove("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES");
 
         var process = new Process { StartInfo = startInfo };
-        
-        process.OutputDataReceived += (sender, e) => {
+
+        process.OutputDataReceived += (sender, e) =>
+        {
             if (!string.IsNullOrEmpty(e.Data))
                 Console.WriteLine($"[{resource.Name}] {e.Data}");
         };
-        process.ErrorDataReceived += (sender, e) => {
+        process.ErrorDataReceived += (sender, e) =>
+        {
             if (!string.IsNullOrEmpty(e.Data))
                 Console.Error.WriteLine($"[{resource.Name} ERR] {e.Data}");
         };

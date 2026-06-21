@@ -1,11 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using OpenTelemetry.Proto.Collector.Logs.V1;
-using OpenTelemetry.Proto.Collector.Trace.V1;
-using OpenTelemetry.Proto.Trace.V1;
-
-namespace AppPipe.Gateway.Services;
+namespace AppPipe.Hosting;
 
 public record ParsedSpan(
     string TraceId,

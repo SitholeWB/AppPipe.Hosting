@@ -74,3 +74,4 @@ app.MapGet("/", async (IHttpClientFactory factory, ILogger<Program> logger) =>
 });
 
 app.Run();
+
