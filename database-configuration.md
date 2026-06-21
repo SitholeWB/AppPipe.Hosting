@@ -1,14 +1,14 @@
 # Custom Telemetry Database Configuration 💾
 
-By default, **AppPipe** stores OpenTelemetry Protocol (OTLP) telemetry (traces, logs, and metrics) in a circular in-memory buffer ([InMemoryTelemetryStore](file:///d:/Git/Github/open-aspire/AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). While this is perfect for local development, production setups or long-term analytics need persistent storage.
+By default, **AppPipe** stores OpenTelemetry Protocol (OTLP) telemetry (traces, logs, and metrics) in a circular in-memory buffer ([InMemoryTelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). While this is perfect for local development, production setups or long-term analytics need persistent storage.
 
-AppPipe allows you to plug in your own database (such as **SQLite**, **PostgreSQL**, **SQL Server**, or **ClickHouse**) by implementing a single interface: [ITelemetryStore](file:///d:/Git/Github/open-aspire/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs).
+AppPipe allows you to plug in your own database (such as **SQLite**, **PostgreSQL**, **SQL Server**, or **ClickHouse**) by implementing a single interface: [ITelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs).
 
 ---
 
 ## 🏛️ The Telemetry Store Contract
 
-To customize where telemetry is saved and how the dashboard queries it, implement the [ITelemetryStore](file:///d:/Git/Github/open-aspire/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface:
+To customize where telemetry is saved and how the dashboard queries it, implement the [ITelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface:
 
 ```csharp
 using System;

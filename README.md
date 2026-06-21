@@ -121,7 +121,7 @@ You can customize the dashboard and gateway behavior in your `appsettings.json` 
 
 ## 💾 Customizing the Telemetry Database
 
-By default, AppPipe retains telemetry in a circular in-memory buffer ([InMemoryTelemetryStore](file:///d:/Git/Github/open-aspire/AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). For production environments, you can plug in any database (such as SQLite, PostgreSQL, SQL Server, or ClickHouse) by implementing the [ITelemetryStore](file:///d:/Git/Github/open-aspire/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and registering it:
+By default, AppPipe retains telemetry in a circular in-memory buffer ([InMemoryTelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). For production environments, you can plug in any database (such as SQLite, PostgreSQL, SQL Server, or ClickHouse) by implementing the [ITelemetryStore](file:///d:/Git/Github/AppPipe.Hosting/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and registering it:
 
 ```csharp
 builder.ConfigureGateway(gatewayBuilder =>
@@ -130,26 +130,95 @@ builder.ConfigureGateway(gatewayBuilder =>
 });
 ```
 
-For complete step-by-step code examples, see the [Custom Telemetry Database Configuration Guide](file:///d:/Git/Github/open-aspire/database-configuration.md).
+For complete step-by-step code examples, see the [Custom Telemetry Database Configuration Guide](file:///d:/Git/Github/AppPipe.Hosting/database-configuration.md).
 
 ---
 
 ## 🏢 On-Premises Deployment
 
-AppPipe includes a built-in deployment module to automate builds and deploy directly to IIS or systemd.
+AppPipe includes a built-in deployment module utilizing `ModularPipelines` to automate publishing and deployments directly to IIS, Windows Services, or Linux `systemd`.
 
-### Deploying to IIS (Windows Server)
-To deploy the gateway and microservices as sub-applications under a default IIS site:
+### 1. Customizing Deployment Properties (Fluent Builder)
+You can configure environment-specific settings (such as custom IIS AppPools, sites, display names, startup accounts, and hosting models) directly in your orchestrator topology configuration:
+
+```csharp
+var backend = builder.AddProject("BackendWorker")
+    // IIS Settings
+    .WithAppPool("CustomBackendPool")
+    .WithIISSite("Default Web Site")
+    .WithHostingModel("OutOfProcess") // "InProcess" or "OutOfProcess"
+    
+    // Windows Service / systemd Settings
+    .WithServiceDisplayName("AppPipe Backend Worker Service")
+    .WithServiceDescription("AppPipe backend processing service runs tasks.")
+    .WithServiceStartType("auto") // "auto", "demand", or "disabled"
+    .WithServiceAccount("LocalSystem") // Or domain account: "DOMAIN\user", "password"
+```
+
+### 2. Running Local Deployments
+To deploy the gateway and microservices directly from your development machine:
 
 ```bash
-dotnet run --project YourDevHost.csproj -- deploy /app-pipe-host-test
+# Deploy to IIS under a custom sub-path
+dotnet run --project YourDevHost.csproj -- --deploy iis /app-pipe-host-test
+
+# Deploy as Windows Services
+dotnet run --project YourDevHost.csproj -- --deploy windows-service
 ```
-The pipeline automatically:
-1. Stops existing Application Pools to unlock files.
-2. Compiles your projects in `Release` mode.
-3. Automatically sets up dedicated AppPools and sub-applications in IIS.
-4. Generates unique tokens and environments to authenticate intra-app loopback telemetry safely.
-5. Restarts the Application Pools.
+
+---
+
+## 🚀 DevOps CI/CD Pipelines (Deploying Pre-Compiled DLLs)
+
+In a typical CI/CD pipeline, the build agent compiles the code (creating DLL artifacts), and the release agent downloads the pre-compiled files onto the target environment where **no source code or `.csproj` files exist**.
+
+AppPipe supports this via the `--prepublished-dir` flag and configuration binding.
+
+### 1. CI Stage (Build)
+Compile and publish your projects into a target directory (e.g. `./publish`):
+```bash
+# Publish DevHost (Orchestrator) and child projects
+dotnet publish samples/AppPipe.DevHost/AppPipe.DevHost.csproj -c Release -o ./publish/AppPipe.DevHost
+dotnet publish samples/BackendWorker/BackendWorker.csproj -c Release -o ./publish/BackendWorker
+dotnet publish samples/FrontendApi/FrontendApi.csproj -c Release -o ./publish/FrontendApi
+```
+Upload the `./publish` directory as a build artifact.
+
+### 2. CD Stage (Deploy)
+Download the published artifact to the target server and execute the orchestrator pointing to the pre-compiled folder. This **completely bypasses source code compilation and `.csproj` file searches**:
+
+```bash
+dotnet C:\inetpub\apps\AppPipe\AppPipe.DevHost.dll --deploy iis --prepublished-dir C:\inetpub\apps\AppPipe
+```
+
+### 3. Handling Environment-Specific Configs & Secrets
+To avoid hardcoding values (like AppPool names, Service Accounts, or database passwords) in `Program.cs`, bind your orchestrator to .NET configuration (`IConfiguration`):
+
+```csharp
+// Program.cs
+var config = new ConfigurationBuilder()
+    .AddJsonFile("appsettings.json", optional: true)
+    .AddEnvironmentVariables(prefix: "APPIPE__")
+    .AddCommandLine(args)
+    .Build();
+
+var appPool = config["BackendWorker:AppPoolName"] ?? "DefaultPool";
+var password = config["BackendWorker:ServicePassword"]; // Read securely
+
+builder.AddProject("BackendWorker")
+       .WithAppPool(appPool)
+       .WithServiceAccount(@"DOMAIN\ServiceAccount", password);
+```
+
+#### Injecting Values securely in your CD pipeline:
+* **As Environment Variables**: Map pipeline variables or secrets as environment variables prefixed with `APPIPE__`:
+  * `APPIPE__BackendWorker__AppPoolName` $\rightarrow$ `ProductionPool`
+  * `APPIPE__BackendWorker__ServicePassword` $\rightarrow$ `$(SecretServicePasswordValue)`
+* **As Command-line Arguments**:
+  ```bash
+  dotnet AppPipe.DevHost.dll --deploy iis --prepublished-dir C:\inetpub\apps\AppPipe --BackendWorker:AppPoolName "ProductionPool" --BackendWorker:ServicePassword "$(SecretServicePasswordValue)"
+  ```
+
 
 ---
 

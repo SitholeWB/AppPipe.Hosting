@@ -8,30 +8,51 @@ using ModularPipelines.Extensions;
 
 namespace AppPipe.Hosting;
 
+public enum DeploymentTarget
+{
+    IIS,
+    WindowsService,
+    LinuxService,
+    LinuxNginx,
+    LinuxCaddy
+}
+
 public class DeploymentOptions
 {
-    public string IISPath { get; set; } = string.Empty;
+    public DeploymentTarget Target { get; set; } = DeploymentTarget.IIS;
+    public string Path { get; set; } = string.Empty;
+    public string IISPath => Path;
 }
 
 public class OnPremDeployer
 {
-    public static async Task CompileToOnPremAsync(AppPipeApp app, string iisPath = "")
+    public static async Task CompileToOnPremAsync(AppPipeApp app, DeploymentTarget target = DeploymentTarget.IIS, string path = "")
     {
-        Console.WriteLine("Starting AppPipe ModularPipelines Deployment...");
+        Console.WriteLine($"Starting AppPipe ModularPipelines Deployment targeting {target}...");
         
         var pipeline = await PipelineHostBuilder.Create()
             .ConfigureServices((context, services) =>
             {
                 services.AddSingleton(app);
-                services.AddSingleton(new DeploymentOptions { IISPath = string.IsNullOrEmpty(iisPath) ? "" : (iisPath.StartsWith("/") ? iisPath : "/" + iisPath) });
+                services.AddSingleton(new DeploymentOptions 
+                { 
+                    Target = target,
+                    Path = target == DeploymentTarget.IIS
+                        ? (string.IsNullOrEmpty(path) ? "" : (path.StartsWith("/") ? path : "/" + path))
+                        : path
+                });
                 services.AddModule<PublishProjectsModule>();
                 
-                // Add conditional OS deployment modules
-                if (OperatingSystem.IsWindows())
+                // Add deployment modules based on the selected target
+                if (target == DeploymentTarget.WindowsService)
+                {
+                    services.AddModule<WindowsServiceDeploymentModule>();
+                }
+                else if (target == DeploymentTarget.IIS)
                 {
                     services.AddModule<WindowsIISDeploymentModule>();
                 }
-                else if (OperatingSystem.IsLinux())
+                else if (target == DeploymentTarget.LinuxService || target == DeploymentTarget.LinuxNginx || target == DeploymentTarget.LinuxCaddy)
                 {
                     services.AddModule<LinuxSystemdDeploymentModule>();
                 }

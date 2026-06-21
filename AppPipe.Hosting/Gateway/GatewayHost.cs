@@ -58,6 +58,7 @@ public class GatewayHost
         }
 
         // Add services to the container.
+        builder.Services.AddWindowsService();
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
             

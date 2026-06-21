@@ -18,10 +18,12 @@ namespace AppPipe.Hosting;
 public class LinuxSystemdDeploymentModule : Module<CommandResult[]>
 {
     private readonly AppPipeApp _app;
+    private readonly DeploymentOptions _options;
 
-    public LinuxSystemdDeploymentModule(AppPipeApp app)
+    public LinuxSystemdDeploymentModule(AppPipeApp app, DeploymentOptions options)
     {
         _app = app;
+        _options = options;
     }
 
     protected override async Task<SkipDecision> ShouldSkip(IPipelineContext context)
@@ -33,49 +35,99 @@ public class LinuxSystemdDeploymentModule : Module<CommandResult[]>
         return SkipDecision.DoNotSkip;
     }
 
+    private int GetFreePort()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
     protected override async Task<CommandResult[]?> ExecuteAsync(IPipelineContext context, CancellationToken cancellationToken)
     {
         var results = new List<CommandResult>();
         
+        // 1. Gather all projects to run under systemd
+        var projectsToDeploy = new List<(ProjectResource Project, Dictionary<string, string> EnvVars)>();
+        var telemetryPort = GetFreePort();
+
+        if (_app.HostProject != null)
+        {
+            var envVars = new Dictionary<string, string>
+            {
+                { "TELEMETRY_PORT", telemetryPort.ToString() },
+                { "LINUX_SERVICE", "true" },
+                { "ASPNETCORE_ENVIRONMENT", "Production" },
+                { "ASPNETCORE_URLS", $"http://localhost:{_app.HostProject.AssignedPort}" }
+            };
+            projectsToDeploy.Add((_app.HostProject, envVars));
+        }
+
         foreach (var resource in _app.Resources)
         {
-            if (resource is AppPipe.Hosting.ProjectResource project)
+            if (resource is ProjectResource project)
             {
-                var publishPath = Path.Combine(Environment.CurrentDirectory, "publish", project.Name);
+                var envVars = new Dictionary<string, string>
+                {
+                    { "OTEL_EXPORTER_OTLP_ENDPOINT", $"http://localhost:{telemetryPort}" },
+                    { "ASPNETCORE_ENVIRONMENT", "Production" },
+                    { "ASPNETCORE_URLS", $"http://localhost:{project.AssignedPort}" }
+                };
 
-                context.Logger.LogInformation($"Deploying {project.Name} to systemd...");
+                foreach (var reference in project.References)
+                {
+                    envVars[$"services__{reference.Name}__http__0"] = $"http://localhost:{reference.AssignedPort}";
+                }
 
-                var serviceContent = $@"
+                foreach (var env in project.EnvironmentVariables)
+                {
+                    envVars[env.Key] = env.Value;
+                }
+
+                projectsToDeploy.Add((project, envVars));
+            }
+        }
+
+        // 2. Deploy under systemd
+        foreach (var item in projectsToDeploy)
+        {
+            var project = item.Project;
+            var envVars = item.EnvVars;
+            var publishPath = Path.Combine(Environment.CurrentDirectory, "publish", project.Name);
+            
+            context.Logger.LogInformation($"Deploying {project.Name} to systemd...");
+
+            var description = project.ServiceDescription ?? $"{project.Name} Service";
+            var userLine = !string.IsNullOrEmpty(project.ServiceAccount) ? $"User={project.ServiceAccount}\n" : "";
+
+            var serviceContent = $@"
 [Unit]
-Description={project.Name} Service
+Description={description}
 After=network.target
 
 [Service]
-WorkingDirectory={publishPath}
+{userLine}WorkingDirectory={publishPath}
 ExecStart=/usr/bin/dotnet {publishPath}/{project.Name}.dll
 Restart=always
 RestartSec=10
 SyslogIdentifier={project.Name}
-Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=ASPNETCORE_URLS=http://*:{project.AssignedPort}
 ";
-            
-            foreach(var r in project.References)
+            foreach (var env in envVars)
             {
-                serviceContent += $"Environment=services__{r.Name}__http__0=http://localhost:{r.AssignedPort}\n";
+                serviceContent += $"Environment={env.Key}={env.Value}\n";
             }
 
             serviceContent += @"
 [Install]
 WantedBy=multi-user.target
 ";
+
             var fileName = $"{project.Name}.service";
             var serviceFilePath = $"/etc/systemd/system/{fileName}";
             
             try
             {
-                // Note: Writing directly to /etc/systemd requires root permissions.
-                // If running locally as non-root, this may fail, which is handled in catch block.
                 await File.WriteAllTextAsync(serviceFilePath, serviceContent, cancellationToken);
 
                 var reloadResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("systemctl")
@@ -89,13 +141,155 @@ WantedBy=multi-user.target
                     Arguments = new[] { "enable", "--now", fileName }
                 }, cancellationToken);
                 results.Add(enableResult);
+
+                var restartResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("systemctl")
+                {
+                    Arguments = new[] { "restart", fileName }
+                }, cancellationToken);
+                results.Add(restartResult);
             }
             catch (Exception ex)
             {
-                context.Logger.LogWarning($"Failed to configure systemd. Are you running as root? Error: {ex.Message}");
+                context.Logger.LogWarning($"Failed to configure systemd for {project.Name}. Are you running as root? Error: {ex.Message}");
             }
-            } // end if ProjectResource
-        } // end foreach
+        }
+
+        // 3. Automate Nginx Reverse Proxy
+        if (_options.Target == DeploymentTarget.LinuxNginx)
+        {
+            context.Logger.LogInformation("Configuring Nginx reverse proxy...");
+            var nginxConfig = new System.Text.StringBuilder();
+            nginxConfig.AppendLine("server {");
+            nginxConfig.AppendLine("    listen 80;");
+            nginxConfig.AppendLine("    server_name localhost;");
+            nginxConfig.AppendLine();
+
+            // Route for Gateway/Dashboard
+            if (_app.HostProject != null)
+            {
+                nginxConfig.AppendLine("    location / {");
+                nginxConfig.AppendLine($"        proxy_pass http://localhost:{_app.HostProject.AssignedPort};");
+                nginxConfig.AppendLine("        proxy_http_version 1.1;");
+                nginxConfig.AppendLine("        proxy_set_header Upgrade $http_upgrade;");
+                nginxConfig.AppendLine("        proxy_set_header Connection keep-alive;");
+                nginxConfig.AppendLine("        proxy_set_header Host $host;");
+                nginxConfig.AppendLine("        proxy_cache_bypass $http_upgrade;");
+                nginxConfig.AppendLine("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;");
+                nginxConfig.AppendLine("        proxy_set_header X-Forwarded-Proto $scheme;");
+                nginxConfig.AppendLine("    }");
+                nginxConfig.AppendLine();
+            }
+
+            // Routes for Child Projects
+            foreach (var resource in _app.Resources)
+            {
+                if (resource is ProjectResource project)
+                {
+                    var paths = new[] { $"/{project.Name}/", $"/{project.Name.ToLower()}/" };
+                    foreach (var path in paths)
+                    {
+                        nginxConfig.AppendLine($"    location {path} {{");
+                        nginxConfig.AppendLine($"        proxy_pass http://localhost:{project.AssignedPort}/;");
+                        nginxConfig.AppendLine("        proxy_http_version 1.1;");
+                        nginxConfig.AppendLine("        proxy_set_header Upgrade $http_upgrade;");
+                        nginxConfig.AppendLine("        proxy_set_header Connection keep-alive;");
+                        nginxConfig.AppendLine("        proxy_set_header Host $host;");
+                        nginxConfig.AppendLine("        proxy_cache_bypass $http_upgrade;");
+                        nginxConfig.AppendLine("        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;");
+                        nginxConfig.AppendLine("        proxy_set_header X-Forwarded-Proto $scheme;");
+                        nginxConfig.AppendLine("    }");
+                        nginxConfig.AppendLine();
+                    }
+                }
+            }
+
+            nginxConfig.AppendLine("}");
+
+            try
+            {
+                var nginxPath = "/etc/nginx/sites-available/apppipe";
+                var symlinkPath = "/etc/nginx/sites-enabled/apppipe";
+                
+                await File.WriteAllTextAsync(nginxPath, nginxConfig.ToString(), cancellationToken);
+
+                // Create symlink
+                await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("ln")
+                {
+                    Arguments = new[] { "-sf", nginxPath, symlinkPath }
+                }, cancellationToken);
+
+                // Test nginx
+                await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("nginx")
+                {
+                    Arguments = new[] { "-t" }
+                }, cancellationToken);
+
+                // Reload nginx
+                var reloadResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("systemctl")
+                {
+                    Arguments = new[] { "reload", "nginx" }
+                }, cancellationToken);
+                results.Add(reloadResult);
+                
+                context.Logger.LogInformation("Successfully configured and reloaded Nginx reverse proxy.");
+            }
+            catch (Exception ex)
+            {
+                context.Logger.LogWarning($"Failed to configure Nginx. Are you running as root and is Nginx installed? Error: {ex.Message}");
+            }
+        }
+
+        // 4. Automate Caddy Reverse Proxy
+        if (_options.Target == DeploymentTarget.LinuxCaddy)
+        {
+            context.Logger.LogInformation("Configuring Caddy reverse proxy...");
+            var caddyConfig = new System.Text.StringBuilder();
+            caddyConfig.AppendLine(":80 {");
+
+            // Route for Child Projects
+            foreach (var resource in _app.Resources)
+            {
+                if (resource is ProjectResource project)
+                {
+                    var names = new[] { project.Name, project.Name.ToLower() };
+                    foreach (var name in names)
+                    {
+                        caddyConfig.AppendLine($"    handle_path /{name}/* {{");
+                        caddyConfig.AppendLine($"        reverse_proxy localhost:{project.AssignedPort}");
+                        caddyConfig.AppendLine("    }");
+                    }
+                }
+            }
+
+            // Route for Gateway/Dashboard (fallback)
+            if (_app.HostProject != null)
+            {
+                caddyConfig.AppendLine("    handle /* {");
+                caddyConfig.AppendLine($"        reverse_proxy localhost:{_app.HostProject.AssignedPort}");
+                caddyConfig.AppendLine("    }");
+            }
+
+            caddyConfig.AppendLine("}");
+
+            try
+            {
+                var caddyfilePath = "/etc/caddy/Caddyfile";
+                await File.WriteAllTextAsync(caddyfilePath, caddyConfig.ToString(), cancellationToken);
+
+                // Reload caddy
+                var reloadResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("systemctl")
+                {
+                    Arguments = new[] { "reload", "caddy" }
+                }, cancellationToken);
+                results.Add(reloadResult);
+                
+                context.Logger.LogInformation("Successfully configured and reloaded Caddy reverse proxy.");
+            }
+            catch (Exception ex)
+            {
+                context.Logger.LogWarning($"Failed to configure Caddy. Are you running as root and is Caddy installed? Error: {ex.Message}");
+            }
+        }
 
         return results.ToArray();
     }

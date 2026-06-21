@@ -85,13 +85,30 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
             }
         }
 
+        try
+        {
+            // Restart IIS now that deployment is complete
+            var startResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("cmd.exe")
+            {
+                Arguments = new[] { "/c", "iisreset /start" }
+            }, cancellationToken);
+            results.Add(startResult);
+        }
+        catch (Exception ex)
+        {
+            context.Logger.LogWarning($"Failed to restart IIS: {ex.Message}");
+        }
+
         return results.ToArray();
     }
 
     private async Task DeployProjectToIIS(IPipelineContext context, ProjectResource project, string appPath, string appCmdPath, CancellationToken cancellationToken, List<CommandResult> results, Dictionary<string, string> envVars, bool outOfProcess)
     {
         var publishPath = Path.Combine(Environment.CurrentDirectory, "publish", project.Name);
-        context.Logger.LogInformation($"Deploying {project.Name} to IIS at path {appPath}...");
+        var appPoolName = project.AppPoolName ?? $"{project.Name}Pool";
+        var siteName = project.IISSiteName;
+        
+        context.Logger.LogInformation($"Deploying {project.Name} to IIS at site '{siteName}', path '{appPath}' using AppPool '{appPoolName}'...");
 
         var webConfigPath = Path.Combine(publishPath, "web.config");
         if (File.Exists(webConfigPath))
@@ -102,9 +119,10 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
                 var aspNetCore = doc.Descendants("aspNetCore").FirstOrDefault();
                 if (aspNetCore != null)
                 {
-                    if (outOfProcess)
+                    var model = project.HostingModel ?? (outOfProcess ? "OutOfProcess" : null);
+                    if (!string.IsNullOrEmpty(model))
                     {
-                        aspNetCore.SetAttributeValue("hostingModel", "OutOfProcess");
+                        aspNetCore.SetAttributeValue("hostingModel", model);
                     }
                     
                     var envVarsElement = aspNetCore.Elements("environmentVariables").FirstOrDefault();
@@ -121,8 +139,8 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
                     foreach(var kvp in envVars)
                     {
                         envVarsElement.Add(new XElement("environmentVariable", 
-                            new XAttribute("name", kvp.Key), 
-                            new XAttribute("value", kvp.Value)));
+                             new XAttribute("name", kvp.Key), 
+                             new XAttribute("value", kvp.Value)));
                     }
                     doc.Save(webConfigPath);
                 }
@@ -140,22 +158,66 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
                 // Create AppPool
                 var appPoolResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
                 {
-                    Arguments = new[] { "add", "apppool", $"/name:{project.Name}Pool" }
+                    Arguments = new[] { "add", "apppool", $"/name:{appPoolName}" }
                 }, cancellationToken);
                 results.Add(appPoolResult);
             }
             catch (Exception ex) { context.Logger.LogWarning($"AppPool warning: {ex.Message}"); }
 
+            if (!string.IsNullOrEmpty(project.ServiceAccount))
+            {
+                try
+                {
+                    var isBuiltIn = project.ServiceAccount.Equals("ApplicationPoolIdentity", StringComparison.OrdinalIgnoreCase) ||
+                                     project.ServiceAccount.Equals("LocalSystem", StringComparison.OrdinalIgnoreCase) ||
+                                     project.ServiceAccount.Equals("LocalService", StringComparison.OrdinalIgnoreCase) ||
+                                     project.ServiceAccount.Equals("NetworkService", StringComparison.OrdinalIgnoreCase);
+
+                    if (isBuiltIn)
+                    {
+                        // Set AppPool Identity Type
+                        var identityResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                        {
+                            Arguments = new[] { "set", "apppool", appPoolName, $"/processModel.identityType:{project.ServiceAccount}" }
+                        }, cancellationToken);
+                        results.Add(identityResult);
+                    }
+                    else
+                    {
+                        // Set Specific User Username and Password
+                        var identityResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                        {
+                            Arguments = new[] { "set", "apppool", appPoolName, "/processModel.identityType:SpecificUser", $"/processModel.userName:{project.ServiceAccount}", $"/processModel.password:{project.ServicePassword ?? ""}" }
+                        }, cancellationToken);
+                        results.Add(identityResult);
+                    }
+                }
+                catch (Exception ex) { context.Logger.LogWarning($"Failed to set AppPool identity: {ex.Message}"); }
+            }
+
             try
             {
-                // Create App under Default Web Site
+                // Delete existing App if it exists, to update the physical path/pool cleanly
+                await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                {
+                    Arguments = new[] { "delete", "app", $"{siteName}{appPath}" }
+                }, cancellationToken);
+            }
+            catch (Exception) { /* Ignore if it doesn't exist */ }
+
+            try
+            {
+                // Create App under configured Site
                 var siteResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
                 {
-                    Arguments = new[] { "add", "app", $"/site.name:Default Web Site", $"/path:{appPath}", $"/physicalPath:{publishPath}", $"/applicationPool:{project.Name}Pool" }
+                    Arguments = new[] { "add", "app", $"/site.name:{siteName}", $"/path:{appPath}", $"/physicalPath:{publishPath}", $"/applicationPool:{appPoolName}" }
                 }, cancellationToken);
                 results.Add(siteResult);
             }
-            catch (Exception ex) { context.Logger.LogWarning($"App creation warning: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                context.Logger.LogError($"Failed to create IIS app: {ex.Message}");
+            }
         }
         catch (Exception ex)
         {

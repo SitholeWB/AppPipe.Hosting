@@ -29,29 +29,84 @@ internal class Program
         //Or builder.AddProject<BackendWorker.Program>()
         var backend = builder.AddProject("BackendWorker")
                              .WithEndpoint(7002)
-                             .WithEnvironment("LOG_LEVEL", "Debug");
+                             .WithEnvironment("LOG_LEVEL", "Debug")
+                             .WithAppPool("CustomBackendPool")
+                             .WithIISSite("Default Web Site")
+                             .WithServiceDisplayName("AppPipe Backend Worker Service")
+                             .WithServiceDescription("AppPipe backend processing service runs tasks and telemetries.")
+                             .WithServiceStartType("auto");
 
         // Add the public frontend API and tell the orchestrator it depends on the backend
         var frontend = builder.AddProject("FrontendApi")
                               .WithReference(backend)
                               .WithEndpoint(7003)
-                              .WithEnvironment("LOG_LEVEL", "Debug");
+                              .WithEnvironment("LOG_LEVEL", "Debug")
+                              .WithAppPool("CustomFrontendPool")
+                              .WithIISSite("Default Web Site")
+                              .WithServiceDisplayName("AppPipe Frontend API Service")
+                              .WithServiceDescription("AppPipe public API gateway and web request handler.")
+                              .WithServiceStartType("auto");
 
         // 3. Build the graph
         var app = builder.Build();
 
-        if (args.Length > 0 && args[0] == "deploy")
+        if (args.Length > 0 && (args[0] == "deploy" || args[0] == "deploy-service" || args[0] == "--deploy"))
         {
 #if !NETSTANDARD2_0
-            var deployPath = args.Length > 1 ? args[1] : "";
-            await OnPremDeployer.CompileToOnPremAsync(app, deployPath);
+            var target = DeploymentTarget.IIS;
+            var deployPath = "";
+
+            if (args[0] == "deploy-service")
+            {
+                target = DeploymentTarget.WindowsService;
+                deployPath = args.Length > 1 ? args[1] : "";
+            }
+            else if (args[0] == "--deploy")
+            {
+                var targetStr = args.Length > 1 ? args[1] : "iis";
+                deployPath = args.Length > 2 ? args[2] : "";
+
+                if (targetStr.Equals("windows-service", StringComparison.OrdinalIgnoreCase) || targetStr.Equals("service", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.WindowsService;
+                }
+                else if (targetStr.Equals("iis", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.IIS;
+                }
+                else if (targetStr.Equals("linux-service", StringComparison.OrdinalIgnoreCase) || targetStr.Equals("systemd", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.LinuxService;
+                }
+                else if (targetStr.Equals("linux-nginx", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.LinuxNginx;
+                }
+                else if (targetStr.Equals("linux-caddy", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.LinuxCaddy;
+                }
+                else
+                {
+                    throw new ArgumentException($"Unknown deployment target: {targetStr}");
+                }
+            }
+            else // "deploy"
+            {
+                target = DeploymentTarget.IIS;
+                deployPath = args.Length > 1 ? args[1] : "";
+            }
+
+            await OnPremDeployer.CompileToOnPremAsync(app, target, deployPath);
 #else
             Console.WriteLine("Deployment not supported on this framework.");
 #endif
         }
-        else if (Environment.GetEnvironmentVariable("APP_POOL_ID") != null)
+        else if (Environment.GetEnvironmentVariable("APP_POOL_ID") != null || 
+                 Environment.GetEnvironmentVariable("WINDOWS_SERVICE") == "true" ||
+                 Environment.GetEnvironmentVariable("LINUX_SERVICE") == "true")
         {
-            // We are deployed inside IIS. Run the Dashboard/Gateway only.
+            // We are deployed inside IIS, Windows Service, or Linux systemd Service. Run the Dashboard/Gateway only.
             var gateway = new AppPipe.Hosting.GatewayHost();
             await gateway.StartAsync(string.Empty, app, app.ConfigureGatewayAction);
             await Task.Delay(-1);
