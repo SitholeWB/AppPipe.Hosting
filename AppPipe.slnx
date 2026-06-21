@@ -3,9 +3,9 @@
     <File Path=".gitignore" />
   </Folder>
   <Folder Name="/samples/">
-    <Project Path="samples\AppPipe.DevHost\AppPipe.DevHost.csproj" />
-    <Project Path="samples\BackendWorker\BackendWorker.csproj" />
-    <Project Path="samples\FrontendApi\FrontendApi.csproj" />
+    <Project Path="samples/AppPipe.DevHost/AppPipe.DevHost.csproj" />
+    <Project Path="samples/BackendWorker/BackendWorker.csproj" />
+    <Project Path="samples/FrontendApi/FrontendApi.csproj" />
   </Folder>
   <Project Path="AppPipe.Hosting\AppPipe.Hosting.csproj" />
 </Solution>
