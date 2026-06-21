@@ -69,9 +69,20 @@ public class AppPipeAppBuilder
         return AddExecutable(name, command, workingDirectory, "run", scriptName);
     }
 
+    public Action<Microsoft.AspNetCore.Builder.WebApplicationBuilder>? ConfigureGatewayAction { get; set; }
+
+    public AppPipeAppBuilder ConfigureGateway(Action<Microsoft.AspNetCore.Builder.WebApplicationBuilder> configureAction)
+    {
+        ConfigureGatewayAction = configureAction;
+        return this;
+    }
+
     public AppPipeApp Build()
     {
-        return new AppPipeApp(_resources, HostProject);
+        return new AppPipeApp(_resources, HostProject)
+        {
+            ConfigureGatewayAction = ConfigureGatewayAction
+        };
     }
 }
 
@@ -79,6 +90,7 @@ public class AppPipeApp
 {
     public IReadOnlyList<AppResource> Resources { get; }
     public ProjectResource? HostProject { get; }
+    public Action<Microsoft.AspNetCore.Builder.WebApplicationBuilder>? ConfigureGatewayAction { get; set; }
 
     public AppPipeApp(IEnumerable<AppResource> resources, ProjectResource? hostProject = null)
     {

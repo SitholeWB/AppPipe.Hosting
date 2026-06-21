@@ -53,7 +53,7 @@ internal class Program
         {
             // We are deployed inside IIS. Run the Dashboard/Gateway only.
             var gateway = new AppPipe.Hosting.GatewayHost();
-            await gateway.StartAsync(null, app);
+            await gateway.StartAsync(string.Empty, app, app.ConfigureGatewayAction);
             await Task.Delay(-1);
         }
         else

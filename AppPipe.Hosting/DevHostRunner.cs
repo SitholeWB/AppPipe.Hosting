@@ -47,7 +47,7 @@ public class DevHostRunner
 
         // 2. Start Gateway Internally
         var gatewayHost = new GatewayHost();
-        var ports = await gatewayHost.StartAsync(yarpConfigFile, _app);
+        var ports = await gatewayHost.StartAsync(yarpConfigFile, _app, _app.ConfigureGatewayAction);
         Console.WriteLine($"AppPipe Gateway (Dashboard & Proxy) started on http://localhost:{ports.DashboardPort}");
         Console.WriteLine($"-> Dashboard: http://localhost:{ports.DashboardPort}/dashboard");
         Console.WriteLine($"-> Telemetry: http://localhost:{ports.TelemetryPort}");

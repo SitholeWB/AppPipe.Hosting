@@ -4,7 +4,7 @@
 [![NuGet Downloads](https://img.shields.io/nuget/dt/AppPipe.Hosting.svg)](https://www.nuget.org/packages/AppPipe.Hosting)
 [![License](https://img.shields.io/github/license/SitholeWB/AppPipe.Hosting.svg)](https://github.com/SitholeWB/AppPipe.Hosting/blob/main/LICENSE)
 
-**AppPipe** (also known as *Open-Aspire*) is a lightweight, on-premises alternative to the **.NET Aspire** dashboard and gateway runner. It is designed to orchestrate, route, and collect telemetry for microservice applications deployed on-premises (such as **IIS on Windows** or **systemd on Linux**). 
+**AppPipe** (similar to *Aspire*) is a lightweight, on-premises alternative to the **.NET Aspire** dashboard and gateway runner. It is designed to orchestrate, route, and collect telemetry for microservice applications deployed on-premises (such as **IIS on Windows** or **systemd on Linux**). 
 
 With AppPipe, you get a beautiful, unified developer dashboard and service discovery proxy without the overhead of cloud-only architectures.
 
@@ -51,11 +51,8 @@ graph TD
 
 ---
 
-## 📦 NuGet Package Setup
 
-AppPipe is published as a NuGet package. You can view the author profile at [nuget.org/profiles/sitholewb](https://www.nuget.org/profiles/sitholewb).
-
-### Install the Package
+### Install the Nuget Package
 
 ```bash
 dotnet add package AppPipe.Hosting
@@ -71,7 +68,7 @@ Configure your services and their relationships in your entry point:
 ```csharp
 using AppPipe.Hosting;
 
-var builder = new AppPipeAppBuilder();
+var builder = AppPipeApp.CreateBuilder(args);
 
 // Define a backend worker microservice
 builder.AddProject("BackendWorker", projectPath: "../BackendWorker/BackendWorker.csproj");
@@ -81,7 +78,10 @@ builder.AddProject("FrontendApi", projectPath: "../FrontendApi/FrontendApi.cspro
        .WithReference("BackendWorker"); // Service discovery environment variables injected automatically
 
 var app = builder.Build();
-await app.RunAsync();
+
+// Run the host using DevHostRunner
+var runner = new DevHostRunner(app);
+await runner.RunAsync();
 ```
 
 ### 2. Configure telemetry in your Microservices
@@ -119,6 +119,21 @@ You can customize the dashboard and gateway behavior in your `appsettings.json` 
 
 ---
 
+## 💾 Customizing the Telemetry Database
+
+By default, AppPipe retains telemetry in a circular in-memory buffer ([InMemoryTelemetryStore](file:///d:/Git/Github/open-aspire/AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). For production environments, you can plug in any database (such as SQLite, PostgreSQL, SQL Server, or ClickHouse) by implementing the [ITelemetryStore](file:///d:/Git/Github/open-aspire/AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and registering it:
+
+```csharp
+builder.ConfigureGateway(gatewayBuilder =>
+{
+    gatewayBuilder.Services.AddSingleton<ITelemetryStore, SqliteTelemetryStore>();
+});
+```
+
+For complete step-by-step code examples, see the [Custom Telemetry Database Configuration Guide](file:///d:/Git/Github/open-aspire/database-configuration.md).
+
+---
+
 ## 🏢 On-Premises Deployment
 
 AppPipe includes a built-in deployment module to automate builds and deploy directly to IIS or systemd.
@@ -138,8 +153,6 @@ The pipeline automatically:
 
 ---
 
-## 👤 Author
-Developed and maintained by **Welcome Bonginhlahla Sithole** ([NuGet Profile](https://www.nuget.org/profiles/sitholewb)).
 
 ## 📄 License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
