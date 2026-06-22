@@ -4,6 +4,13 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using OpenTelemetry;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace AppPipe.Hosting;
 
@@ -23,6 +30,11 @@ public class GatewayAppPipeHost
         var isIIS = Environment.GetEnvironmentVariable("APP_POOL_ID") != null;
         var envTelemetryPort = Environment.GetEnvironmentVariable("TELEMETRY_PORT");
         var telemetryPort = int.TryParse(envTelemetryPort, out var tp) ? tp : 0;
+
+        if (telemetryPort == 0 && !isIIS)
+        {
+            telemetryPort = GetFreePort();
+        }
 
         builder.WebHost.ConfigureKestrel(options =>
         {
@@ -76,6 +88,32 @@ public class GatewayAppPipeHost
         {
             builder.Services.AddSingleton(topology);
         }
+
+        // Configure Gateway Self-Telemetry
+        var serviceName = topology?.HostProject?.Name ?? "AppPipe.Gateway";
+        var resourceBuilder = ResourceBuilder.CreateDefault().AddService(serviceName);
+        var otlpEndpoint = $"http://localhost:{telemetryPort}";
+
+        builder.Services.AddOpenTelemetry()
+            .WithTracing(tracing => tracing
+                .SetResourceBuilder(resourceBuilder)
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSource("Yarp.ReverseProxy")
+                .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)))
+            .WithMetrics(metrics => metrics
+                .SetResourceBuilder(resourceBuilder)
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddMeter("Yarp.ReverseProxy")
+                .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)));
+
+        builder.Logging.AddOpenTelemetry(logging =>
+        {
+            logging.SetResourceBuilder(resourceBuilder);
+            logging.IncludeFormattedMessage = true;
+            logging.AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint));
+        });
 
         // YARP configuration
         builder.Services.AddReverseProxy()
@@ -141,6 +179,16 @@ public class GatewayAppPipeHost
         }
 
         return (actualDashboardPort, actualTelemetryPort);
+    }
+
+    private int GetFreePort()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Server.LingerState = new System.Net.Sockets.LingerOption(true, 0);
+        listener.Stop();
+        return port;
     }
 
     public async Task StopAsync()

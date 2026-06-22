@@ -54,7 +54,7 @@
                 <span class="environment-badge">Development</span>
             </div>
             <div class="header-actions">
-                <a href="https://github.com" target="_blank" class="header-link">Help</a>
+                <a href="https://github.com/SitholeWB/AppPipe.Hosting" target="_blank" class="header-link">Help</a>
             </div>
         </header>
 
@@ -75,20 +75,20 @@
 <style>
     :root {
         /* Light Theme (Aspire-like) */
-        --bg-color: #f9fafb;
-        --sidebar-bg: #ffffff;
-        --header-bg: #ffffff;
+        --bg-color: #f8fafc;
+        --sidebar-bg: rgba(255, 255, 255, 0.75);
+        --header-bg: rgba(255, 255, 255, 0.75);
         --panel-bg: #ffffff;
-        --panel-bg-hover: #f3f4f6;
+        --panel-bg-hover: #f1f5f9;
         --item-bg: #ffffff;
         --accent: #0284c7; /* Aspire blue */
-        --text-main: #111827;
-        --text-muted: #6b7280;
-        --border-color: #e5e7eb;
-        --border-hover: #d1d5db;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --border-color: rgba(226, 232, 240, 0.8);
+        --border-hover: #cbd5e1;
         
-        --table-header-bg: #f9fafb;
-        --table-border: #f3f4f6;
+        --table-header-bg: #f8fafc;
+        --table-border: #f1f5f9;
         
         --badge-success-bg: #dcfce7;
         --badge-success-text: #166534;
@@ -100,34 +100,35 @@
 
     [data-theme="dark"] {
         /* Dark Theme (Aspire-like) */
-        --bg-color: #0d1117;
-        --sidebar-bg: #161b22;
-        --header-bg: #161b22;
-        --panel-bg: #161b22;
-        --panel-bg-hover: #21262d;
-        --item-bg: #161b22;
-        --accent: #58a6ff;
-        --text-main: #c9d1d9;
-        --text-muted: #8b949e;
-        --border-color: #30363d;
-        --border-hover: #484f58;
+        --bg-color: #0b0f19;
+        --sidebar-bg: rgba(20, 26, 42, 0.75);
+        --header-bg: rgba(20, 26, 42, 0.75);
+        --panel-bg: #141a2a;
+        --panel-bg-hover: #1e293b;
+        --item-bg: #141a2a;
+        --accent: #38bdf8;
+        --text-main: #e2e8f0;
+        --text-muted: #94a3b8;
+        --border-color: rgba(51, 65, 85, 0.5);
+        --border-hover: #475569;
         
-        --table-header-bg: #0d1117;
-        --table-border: #21262d;
+        --table-header-bg: #0b0f19;
+        --table-border: #1e293b;
         
-        --badge-success-bg: rgba(46, 160, 67, 0.15);
-        --badge-success-text: #3fb950;
-        --badge-error-bg: rgba(248, 81, 73, 0.1);
-        --badge-error-text: #ff7b72;
-        --badge-info-bg: rgba(56, 139, 253, 0.1);
-        --badge-info-text: #58a6ff;
+        --badge-success-bg: rgba(34, 197, 94, 0.15);
+        --badge-success-text: #4ade80;
+        --badge-error-bg: rgba(239, 68, 68, 0.1);
+        --badge-error-text: #fca5a5;
+        --badge-info-bg: rgba(56, 189, 248, 0.1);
+        --badge-info-text: #38bdf8;
     }
 
     body {
         margin: 0;
-        font-family: 'Segoe UI', Inter, -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+        font-family: 'Outfit', 'Segoe UI', Inter, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
         background-color: var(--bg-color);
         color: var(--text-main);
+        -webkit-font-smoothing: antialiased;
     }
 
     /* Layout */
@@ -142,6 +143,8 @@
     .sidebar {
         width: 260px;
         background-color: var(--sidebar-bg);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
         border-right: 1px solid var(--border-color);
         display: flex;
         flex-direction: column;
@@ -157,8 +160,9 @@
         align-items: center;
         gap: 0.75rem;
         padding: 1.25rem 1.5rem;
-        font-size: 1.1rem;
-        font-weight: 600;
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: -0.025em;
         color: var(--text-main);
         border-bottom: 1px solid var(--border-color);
     }
@@ -167,44 +171,54 @@
         color: var(--accent);
         display: flex;
         align-items: center;
+        filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.3));
     }
 
     .sidebar-nav {
         flex: 1;
-        padding: 1rem 0.75rem;
+        padding: 1.25rem 0.75rem;
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.35rem;
     }
 
     .nav-item {
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        padding: 0.6rem 0.75rem;
-        color: var(--text-main);
+        padding: 0.65rem 0.85rem;
+        color: var(--text-muted);
         text-decoration: none;
-        border-radius: 6px;
+        border-radius: 8px;
         font-size: 0.9rem;
         font-weight: 500;
-        transition: background-color 0.15s, color 0.15s;
+        transition: all 0.2s ease;
     }
 
     .nav-item:hover {
         background-color: var(--panel-bg-hover);
+        color: var(--text-main);
+        transform: translateX(2px);
     }
     
     .nav-item.active {
-        background-color: var(--bg-color);
+        background-color: rgba(2, 132, 199, 0.08);
         color: var(--accent);
         font-weight: 600;
+    }
+    [data-theme="dark"] .nav-item.active {
+        background-color: rgba(56, 189, 248, 0.08);
     }
 
     .nav-item svg {
         color: var(--text-muted);
+        transition: color 0.2s;
     }
     .nav-item.active svg {
         color: var(--accent);
+    }
+    .nav-item:hover svg {
+        color: var(--text-main);
     }
 
     .sidebar-footer {
@@ -220,13 +234,14 @@
         background: transparent;
         border: none;
         color: var(--text-muted);
-        padding: 0.5rem;
-        border-radius: 6px;
+        padding: 0.6rem;
+        border-radius: 8px;
         cursor: pointer;
         font-family: inherit;
         font-size: 0.85rem;
         font-weight: 500;
         text-align: left;
+        transition: all 0.2s;
     }
 
     .theme-toggle:hover {
@@ -245,6 +260,8 @@
     .top-header {
         height: 60px;
         background-color: var(--header-bg);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
         border-bottom: 1px solid var(--border-color);
         display: flex;
         justify-content: space-between;
@@ -256,14 +273,14 @@
     }
     
     .environment-badge {
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 0.25rem 0.6rem;
+        border-radius: 6px;
         background: var(--badge-info-bg);
         color: var(--badge-info-text);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.05em;
     }
     
     .header-link {
@@ -271,6 +288,7 @@
         text-decoration: none;
         font-size: 0.9rem;
         font-weight: 500;
+        transition: color 0.2s;
     }
     
     .header-link:hover {
@@ -278,7 +296,7 @@
     }
 
     .main-content {
-        padding: 2rem;
+        padding: 2.25rem 2rem;
         flex: 1;
     }
 
@@ -286,8 +304,12 @@
     .aspire-table-container {
         background: var(--panel-bg);
         border: 1px solid var(--border-color);
-        border-radius: 8px;
+        border-radius: 12px;
         overflow: hidden;
+        box-shadow: 0 4px 30px -10px rgba(0, 0, 0, 0.05);
+    }
+    [data-theme="dark"] .aspire-table-container {
+        box-shadow: 0 10px 40px -15px rgba(0, 0, 0, 0.3);
     }
     
     .aspire-table {
@@ -301,12 +323,15 @@
         color: var(--text-muted);
         font-weight: 600;
         text-align: left;
-        padding: 0.75rem 1rem;
+        padding: 0.85rem 1.25rem;
         border-bottom: 1px solid var(--border-color);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
     
     .aspire-table td {
-        padding: 0.75rem 1rem;
+        padding: 0.9rem 1.25rem;
         border-bottom: 1px solid var(--table-border);
         color: var(--text-main);
     }
@@ -318,7 +343,6 @@
     .aspire-table tbody tr:last-child td {
         border-bottom: none;
     }
-
 </style>
 
 @code {

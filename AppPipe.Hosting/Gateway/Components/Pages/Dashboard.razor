@@ -20,6 +20,53 @@
         </div>
     </div>
 
+    <!-- Overview Stats Grid -->
+    <div class="stats-grid">
+        <div class="aspire-card stats-card">
+            <div class="stats-icon text-primary">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.58 16.12a5 5 0 0 1 6.84 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+            </div>
+            <div class="stats-details">
+                <h3>Gateway Status</h3>
+                <div class="stats-value text-success">
+                    <span class="pulse-dot"></span> Active
+                </div>
+                <p class="stats-subtext">
+                    IIS Site: @(AppTopology?.HostProject?.IISSiteName ?? "Kestrel Local")<br/>
+                    VDir: @(AppTopology?.HostProject?.AppPath ?? "/")
+                </p>
+            </div>
+        </div>
+        
+        <div class="aspire-card stats-card">
+            <div class="stats-icon text-accent">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+            </div>
+            <div class="stats-details">
+                <h3>Microservices</h3>
+                <div class="stats-value">@(AppTopology?.Resources?.Count ?? 0) Resources</div>
+                <p class="stats-subtext">
+                    Projects: @(AppTopology?.Resources?.Count(r => r is AppPipeHostingProjectResource) ?? 0) | 
+                    Execs: @(AppTopology?.Resources?.Count(r => r is ExecutableAppPipeHostingResource) ?? 0)
+                </p>
+            </div>
+        </div>
+
+        <div class="aspire-card stats-card">
+            <div class="stats-icon text-warning">
+                <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            </div>
+            <div class="stats-details">
+                <h3>Telemetry Activity</h3>
+                <div class="stats-value">@Store.Traces.Count Traces</div>
+                <p class="stats-subtext">
+                    Logs: @Store.Logs.Count | 
+                    Metrics: @Store.Metrics.Count
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- Overview Stats / Activity -->
     <div class="overview-section">
         <div class="aspire-card">
@@ -82,6 +129,36 @@
                 </tr>
             </thead>
             <tbody>
+                @if (AppTopology != null && AppTopology.HostProject != null)
+                {
+                    var isIIS = Environment.GetEnvironmentVariable("APP_POOL_ID") != null;
+                    string endpointUrl;
+                    if (isIIS)
+                    {
+                        var baseUriObj = new Uri(Nav.BaseUri);
+                        var baseIISUrl = $"{baseUriObj.Scheme}://{baseUriObj.Authority}";
+                        var appPath = AppTopology.HostProject.AppPath ?? "/";
+                        if (!appPath.StartsWith("/"))
+                        {
+                            appPath = "/" + appPath;
+                        }
+                        endpointUrl = $"{baseIISUrl}{appPath}";
+                    }
+                    else
+                    {
+                        endpointUrl = $"http://localhost:{AppTopology.HostProject.AssignedPort}";
+                    }
+                    
+                    <tr class="host-project-row">
+                        <td class="fw-semibold">
+                            <span class="host-indicator-dot" title="Host Gateway"></span>
+                            @AppTopology.HostProject.Name <span class="host-tag">Host</span>
+                        </td>
+                        <td>HostProject</td>
+                        <td><span class="status-badge host">Active</span></td>
+                        <td><a href="@endpointUrl" target="_blank" class="endpoint-link">@endpointUrl</a></td>
+                    </tr>
+                }
                 @if (AppTopology != null && AppTopology.Resources.Any())
                 {
                     foreach (var resource in AppTopology.Resources)
@@ -230,6 +307,152 @@
     
     .endpoint-link:hover {
         text-decoration: underline;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .stats-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+        border-radius: 12px;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.02);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px -2px rgba(0, 0, 0, 0.05);
+    }
+    [data-theme="dark"] .stats-card:hover {
+        box-shadow: 0 8px 35px -2px rgba(0, 0, 0, 0.25);
+    }
+
+    .stats-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        background: rgba(2, 132, 199, 0.05);
+        color: var(--accent);
+        flex-shrink: 0;
+    }
+    .stats-icon.text-primary {
+        background: rgba(2, 132, 199, 0.05);
+        color: var(--accent);
+    }
+    .stats-icon.text-accent {
+        background: rgba(56, 189, 248, 0.05);
+        color: var(--accent);
+    }
+    .stats-icon.text-warning {
+        background: rgba(234, 179, 8, 0.05);
+        color: #ca8a04;
+    }
+    [data-theme="dark"] .stats-icon.text-warning {
+        color: #eab308;
+    }
+
+    .stats-details {
+        flex: 1;
+    }
+    .stats-details h3 {
+        margin: 0 0 0.25rem 0;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+    }
+
+    .stats-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--text-main);
+        margin-bottom: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .stats-subtext {
+        margin: 0;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+    }
+
+    /* Pulse Dot for status */
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #22c55e;
+        border-radius: 50%;
+        display: inline-block;
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+        animation: pulse 1.5s infinite;
+    }
+
+    @@keyframes pulse {
+        0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+        }
+        70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+        }
+        100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+        }
+    }
+
+    /* Host Project Row Styling */
+    .host-project-row {
+        background: rgba(2, 132, 199, 0.02) !important;
+        border-left: 3px solid var(--accent);
+    }
+    [data-theme="dark"] .host-project-row {
+        background: rgba(56, 189, 248, 0.02) !important;
+    }
+    .host-indicator-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: var(--accent);
+        border-radius: 50%;
+        margin-right: 8px;
+        box-shadow: 0 0 8px var(--accent);
+    }
+    .host-tag {
+        font-size: 0.7rem;
+        background: var(--badge-info-bg);
+        color: var(--badge-info-text);
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        margin-left: 8px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .status-badge.host {
+        background: var(--badge-info-bg);
+        color: var(--badge-info-text);
+    }
+
+    .activity-svg .bar {
+        rx: 2px;
+        ry: 2px;
     }
 </style>
 
