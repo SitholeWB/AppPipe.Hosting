@@ -1,0 +1,379 @@
+@page "/diagnostics"
+@using AppPipe.Hosting
+@using Microsoft.AspNetCore.Hosting
+@using Microsoft.Extensions.Configuration
+@using System.Diagnostics
+@inject GatewayDiagnosticsService DiagnosticsService
+@inject ITelemetryStore TelemetryStore
+@inject IConfiguration Config
+@inject IWebHostEnvironment Env
+@implements IDisposable
+
+<PageTitle>Diagnostics - AppPipe.NET</PageTitle>
+
+<div class="page-container">
+    <div class="page-header">
+        <h1>Gateway Diagnostics</h1>
+        <div class="header-actions">
+            <span class="live-indicator">
+                <span class="live-dot"></span> Live
+            </span>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="diag-grid">
+        <!-- Telemetry Ingest rates -->
+        <div class="aspire-card diag-card">
+            <div class="diag-header">
+                <h3>Telemetry Ingestion</h3>
+                <span class="diag-icon text-primary">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                </span>
+            </div>
+            <div class="diag-content">
+                <div class="diag-item">
+                    <span class="label">Spans Ingested:</span>
+                    <span class="value">@DiagnosticsService.SpansReceived <span class="rate">(@DiagnosticsService.SpansPerSecond/sec)</span></span>
+                </div>
+                <div class="diag-item">
+                    <span class="label">Logs Ingested:</span>
+                    <span class="value">@DiagnosticsService.LogsReceived <span class="rate">(@DiagnosticsService.LogsPerSecond/sec)</span></span>
+                </div>
+                <div class="diag-item">
+                    <span class="label">Metrics Ingested:</span>
+                    <span class="value">@DiagnosticsService.MetricsReceived <span class="rate">(@DiagnosticsService.MetricsPerSecond/sec)</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connection Diagnostics -->
+        <div class="aspire-card diag-card">
+            <div class="diag-header">
+                <h3>Connection & Load</h3>
+                <span class="diag-icon text-accent">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                </span>
+            </div>
+            <div class="diag-content">
+                <div class="diag-item">
+                    <span class="label">Active Requests:</span>
+                    <span class="value text-success font-bold">@DiagnosticsService.ActiveRequests</span>
+                </div>
+                <div class="diag-item">
+                    <span class="label">Total Proxy Requests:</span>
+                    <span class="value">@DiagnosticsService.TotalRequests</span>
+                </div>
+                <div class="diag-item">
+                    <span class="label">Current Buffer Size:</span>
+                    <span class="value">Traces: @TelemetryStore.Traces.Count | Logs: @TelemetryStore.Logs.Count</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Persistence Diagnostics -->
+        <div class="aspire-card diag-card">
+            <div class="diag-header">
+                <h3>SQLite Persistence</h3>
+                <span class="diag-icon text-warning">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>
+                </span>
+            </div>
+            <div class="diag-content">
+                @{
+                    var isSqlite = TelemetryStore is SqliteTelemetryStore;
+                    var sqliteStore = TelemetryStore as SqliteTelemetryStore;
+                }
+                <div class="diag-item">
+                    <span class="label">Storage Mode:</span>
+                    <span class="value font-bold @(isSqlite ? "text-primary" : "text-muted")">
+                        @(isSqlite ? "SQLite Persistent" : "In-Memory (Fallback)")
+                    </span>
+                </div>
+                @if (isSqlite && sqliteStore != null)
+                {
+                    <div class="diag-item">
+                        <span class="label">DB File Size:</span>
+                        <span class="value">@FormatBytes(sqliteStore.GetDatabaseSize())</span>
+                    </div>
+                    <div class="diag-item">
+                        <span class="label" title="@sqliteStore.DatabasePath">DB File Path:</span>
+                        <span class="value font-mono text-xs db-path" title="@sqliteStore.DatabasePath">@GetFileName(sqliteStore.DatabasePath)</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="diag-item">
+                        <span class="label">Persistence:</span>
+                        <span class="value text-muted">Disabled</span>
+                    </div>
+                    <div class="diag-item">
+                        <span class="label">Buffer Limit:</span>
+                        <span class="value">200 items</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Process & Hosting Details -->
+    <div class="aspire-card system-card">
+        <div class="diag-header">
+            <h3>System & Hosting Context</h3>
+            <span class="diag-icon text-muted">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect><line x1="6" y1="6" x2="18" y2="6"></line><line x1="6" y1="12" x2="18" y2="12"></line><line x1="6" y1="18" x2="12" y2="18"></line></svg>
+            </span>
+        </div>
+        <div class="system-grid">
+            <div class="diag-item">
+                <span class="label">Process Memory:</span>
+                <span class="value font-mono">@FormatBytes(Process.GetCurrentProcess().WorkingSet64)</span>
+            </div>
+            <div class="diag-item">
+                <span class="label">Process Uptime:</span>
+                <span class="value">@FormatUptime(DateTime.Now - Process.GetCurrentProcess().StartTime)</span>
+            </div>
+            <div class="diag-item">
+                <span class="label">Operating System:</span>
+                <span class="value">@System.Runtime.InteropServices.RuntimeInformation.OSDescription</span>
+            </div>
+            <div class="diag-item">
+                <span class="label">Runtime Framework:</span>
+                <span class="value font-mono">@System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription</span>
+            </div>
+            <div class="diag-item">
+                <span class="label">Hosting Environment:</span>
+                <span class="value font-bold text-accent">@Env.EnvironmentName</span>
+            </div>
+            <div class="diag-item">
+                <span class="label">IIS AppPool ID:</span>
+                <span class="value font-mono">@(Environment.GetEnvironmentVariable("APP_POOL_ID") ?? "Not IIS (Kestrel Local)")</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        gap: 1.5rem;
+    }
+    
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .page-header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .live-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: rgba(34, 197, 94, 0.1);
+        color: #22c55e;
+        padding: 0.25rem 0.6rem;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .live-dot {
+        width: 6px;
+        height: 6px;
+        background-color: #22c55e;
+        border-radius: 50%;
+        box-shadow: 0 0 8px #22c55e;
+    }
+
+    .diag-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .diag-card {
+        padding: 1.25rem 1.5rem;
+        border-radius: 12px;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .diag-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.75rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .diag-header h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-main);
+    }
+
+    .diag-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: rgba(2, 132, 199, 0.05);
+        color: var(--accent);
+    }
+
+    .diag-icon.text-primary {
+        background: rgba(2, 132, 199, 0.05);
+        color: var(--accent);
+    }
+
+    .diag-icon.text-accent {
+        background: rgba(56, 189, 248, 0.05);
+        color: var(--accent);
+    }
+
+    .diag-icon.text-warning {
+        background: rgba(234, 179, 8, 0.05);
+        color: #ca8a04;
+    }
+    [data-theme="dark"] .diag-icon.text-warning {
+        color: #eab308;
+    }
+
+    .diag-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .diag-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.9rem;
+    }
+
+    .diag-item .label {
+        color: var(--text-muted);
+    }
+
+    .diag-item .value {
+        color: var(--text-main);
+        font-weight: 500;
+    }
+
+    .diag-item .rate {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-left: 0.25rem;
+    }
+
+    .text-success { color: #22c55e; }
+    .font-bold { font-weight: 700; }
+    .font-mono { font-family: 'Consolas', 'Courier New', monospace; }
+    .text-xs { font-size: 0.75rem; }
+    
+    .db-path {
+        max-width: 180px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .system-card {
+        padding: 1.5rem;
+        border-radius: 12px;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+    }
+
+    .system-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.25rem;
+        padding-top: 1rem;
+    }
+
+    .system-grid .diag-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+        border-bottom: 1px solid var(--table-border);
+        padding-bottom: 0.5rem;
+    }
+
+    .system-grid .diag-item:last-child {
+        border-bottom: none;
+    }
+</style>
+
+@code {
+    private System.Threading.Timer? _refreshTimer;
+
+    protected override void OnInitialized()
+    {
+        _refreshTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(StateHasChanged);
+        }, null, 1000, 1000);
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        int counter = 0;
+        decimal number = bytes;
+        while (Math.Round(number / 1024) >= 1)
+        {
+            number /= 1024;
+            counter++;
+        }
+        return $"{number:n1} {suffixes[counter]}";
+    }
+
+    private string GetFileName(string path)
+    {
+        try
+        {
+            return Path.GetFileName(path);
+        }
+        catch
+        {
+            return path;
+        }
+    }
+
+    private string FormatUptime(TimeSpan uptime)
+    {
+        if (uptime.TotalDays >= 1)
+        {
+            return $"{uptime.Days}d {uptime.Hours}h {uptime.Minutes}m";
+        }
+        if (uptime.TotalHours >= 1)
+        {
+            return $"{uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
+        }
+        return $"{uptime.Minutes}m {uptime.Seconds}s";
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+}

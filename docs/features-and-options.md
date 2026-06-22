@@ -86,10 +86,11 @@ AppPipe exposes a local HTTP/2 Kestrel endpoint that acts as a fully compliant *
 * **Zero Configuration**: Microservices configure standard .NET OTLP exporters, which automatically detect and output telemetry to this local gateway.
 * **Structured Logs & Traces**: Captures structured console logs, distributed tracing spans, and resource metrics.
 
-### 3. InMemory Telemetry Store
-By default, telemetry is stored in an in-memory database (`InMemoryTelemetryStore`).
-* **Circular Limit**: To prevent memory leaks on on-premises hosting VMs, the in-memory store retains a max buffer of **200 traces, logs, and metrics** using a FIFO queue.
-* **Extensible Storage**: Developers can override this default store to persist telemetry to databases like SQLite, PostgreSQL, SQL Server, or ClickHouse by implementing the `ITelemetryStore` interface.
+### 3. Telemetry Store Persistence (SQLite by Default)
+By default, telemetry is stored in a persistent local SQLite database (`SqliteTelemetryStore`), which hydrates the dashboard memory cache on startup.
+* **Data Pruning**: Keeps database sizes bounded by retaining the last 2,000 logs, metrics, and trace IDs.
+* **In-Memory Fallback**: Can be configured to bypass the database and fall back to a circular in-memory buffer (`InMemoryTelemetryStore`) retaining a max buffer of **200 items**.
+* **Extensible Storage**: Developers can override this default store to persist telemetry to databases like PostgreSQL, SQL Server, or ClickHouse by implementing the `ITelemetryStore` interface.
 
 ### 4. Blazor Dashboard UI
 A visual dashboard that allows real-time diagnostics:
@@ -290,7 +291,17 @@ You can define all environment-specific parameters inside your deployment `appse
     "Name": "ProductionDashboard",
     "IISSiteName": "Default Web Site",
     "AppPoolName": "ProductionDashboardPool",
-    "UseWebSockets": false
+    "UseWebSockets": false,
+    "BasicAuth": {
+      "Enabled": true,
+      "Username": "admin",
+      "Password": "MySecretPasswordReference"
+    }
+  },
+  "Telemetry": {
+    "PersistenceEnabled": true,
+    "DatabasePath": "telemetry.db",
+    "MaxDbRecords": 2000
   },
   "BackendWorker": {
     "IISSiteName": "Default Web Site",

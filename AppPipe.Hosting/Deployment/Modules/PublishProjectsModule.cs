@@ -25,6 +25,15 @@ public class PublishProjectsModule : Module<CommandResult[]>
     {
         var results = new List<CommandResult>();
 
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows) && !IsAdministrator())
+        {
+            context.Logger.LogWarning("=================================================================================");
+            context.Logger.LogWarning(" WARNING: Running without Windows Administrator privileges!");
+            context.Logger.LogWarning(" IIS and Service tasks (like iisreset and sc stop) will fail due to permissions.");
+            context.Logger.LogWarning(" Please run the command in an Elevated (Administrator) terminal to avoid locks.");
+            context.Logger.LogWarning("=================================================================================");
+        }
+
         // If on Windows, stop services first to prevent file locks during publish
         if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
         {
@@ -82,6 +91,8 @@ public class PublishProjectsModule : Module<CommandResult[]>
             {
                 var outputPath = Path.Combine(Environment.CurrentDirectory, "publish", project.Name);
                 
+                CleanDirectory(context, outputPath);
+                
                 context.Logger.LogInformation($"Publishing {project.Name} to {outputPath}...");
                 
                 var result = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("dotnet")
@@ -97,6 +108,8 @@ public class PublishProjectsModule : Module<CommandResult[]>
         {
             var outputPath = Path.Combine(Environment.CurrentDirectory, "publish", _app.HostProject.Name);
             
+            CleanDirectory(context, outputPath);
+            
             context.Logger.LogInformation($"Publishing Host Project {_app.HostProject.Name} to {outputPath}...");
             
             var result = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("dotnet")
@@ -108,5 +121,40 @@ public class PublishProjectsModule : Module<CommandResult[]>
         }
 
         return results.ToArray();
+    }
+
+    private bool IsAdministrator()
+    {
+        if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+            return true;
+
+        try
+        {
+            using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+            {
+                var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void CleanDirectory(IPipelineContext context, string path)
+    {
+        if (Directory.Exists(path))
+        {
+            context.Logger.LogInformation($"Cleaning target publish folder: {path}...");
+            try
+            {
+                Directory.Delete(path, true);
+            }
+            catch (Exception ex)
+            {
+                context.Logger.LogWarning($"Warning: Failed to clean directory {path}: {ex.Message}. It may contain locked files.");
+            }
+        }
     }
 }

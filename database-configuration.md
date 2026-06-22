@@ -1,12 +1,34 @@
-# Custom Telemetry Database Configuration 💾
+# Telemetry Database Configuration & Persistence 💾
 
-By default, **AppPipe** stores OpenTelemetry Protocol (OTLP) telemetry (traces, logs, and metrics) in a circular in-memory buffer ([InMemoryTelemetryStore](AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). While this is perfect for local development, production setups or long-term analytics need persistent storage.
-
-AppPipe allows you to plug in your own database (such as **SQLite**, **PostgreSQL**, **SQL Server**, or **ClickHouse**) by implementing a single interface: [ITelemetryStore](AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs).
+By default, **AppPipe** stores OpenTelemetry Protocol (OTLP) telemetry (traces, logs, and metrics) in a persistent local **SQLite database** ([SqliteTelemetryStore](AppPipe.Hosting/Gateway/Services/SqliteTelemetryStore.cs)). This ensures that diagnostics, distributed tracing timelines, and logs survive application pool recycles and server restarts.
 
 ---
 
-## 🏛️ The Telemetry Store Contract
+## ⚙️ Configurable Persistence Properties
+
+You can customize or disable the built-in SQLite database persistence directly via your orchestrator's `appsettings.json` or through environment variables:
+
+```json
+{
+  "Telemetry": {
+    "PersistenceEnabled": true,
+    "DatabasePath": "telemetry.db",
+    "MaxDbRecords": 2000
+  }
+}
+```
+
+| Config Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `Telemetry:PersistenceEnabled` | `bool` | `true` | Set to `true` to enable SQLite database storage. Set to `false` to fall back to purely in-memory buffer (`InMemoryTelemetryStore`). |
+| `Telemetry:DatabasePath` | `string` | `telemetry.db` | The path to the SQLite database file. Defaults to `telemetry.db` in the application execution directory (`AppContext.BaseDirectory`). |
+| `Telemetry:MaxDbRecords` | `int` | `2000` | Limits the maximum number of logs, metrics, and trace IDs retained in the SQLite database to prevent infinite file size expansion. |
+
+---
+
+## 🏛️ Custom Database Configurations
+
+If you want to plug in a different database provider (such as **PostgreSQL**, **SQL Server**, or **ClickHouse**), you can easily do so by implementing the [ITelemetryStore](AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface:
 
 To customize where telemetry is saved and how the dashboard queries it, implement the [ITelemetryStore](AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface:
 

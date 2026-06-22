@@ -10,12 +10,12 @@ public class InMemoryTelemetryStore : ITelemetryStore
     private const int MaxItems = 200;
 
     public ConcurrentDictionary<string, ParsedTrace> Traces { get; } = new();
-    private ConcurrentQueue<string> _traceIds = new();
+    protected ConcurrentQueue<string> TraceIds { get; } = new();
 
     public ConcurrentQueue<ParsedLog> Logs { get; } = new();
     public ConcurrentQueue<ExportMetricsServiceRequest> Metrics { get; } = new();
 
-    public void AddTrace(ExportTraceServiceRequest request)
+    public virtual void AddTrace(ExportTraceServiceRequest request)
     {
         bool newTraceAdded = false;
 
@@ -62,7 +62,7 @@ public class InMemoryTelemetryStore : ITelemetryStore
                         (id) =>
                         {
                             newTraceAdded = true;
-                            _traceIds.Enqueue(id);
+                            TraceIds.Enqueue(id);
 
                             var trace = new ParsedTrace(id, startTime, TimeSpan.Zero, null, new List<ParsedSpan> { parsedSpan }, isError);
                             return RecomputeTrace(trace);
@@ -83,7 +83,7 @@ public class InMemoryTelemetryStore : ITelemetryStore
             }
         }
 
-        while (_traceIds.Count > MaxItems && _traceIds.TryDequeue(out var oldId))
+        while (TraceIds.Count > MaxItems && TraceIds.TryDequeue(out var oldId))
         {
             Traces.TryRemove(oldId, out _);
         }
@@ -91,7 +91,7 @@ public class InMemoryTelemetryStore : ITelemetryStore
         OnTelemetryReceived?.Invoke();
     }
 
-    private ParsedTrace RecomputeTrace(ParsedTrace trace)
+    protected ParsedTrace RecomputeTrace(ParsedTrace trace)
     {
         if (trace.AllSpans.Count == 0) return trace;
 
@@ -114,7 +114,7 @@ public class InMemoryTelemetryStore : ITelemetryStore
         return trace with { RootSpan = root ?? allNewSpans.First(), AllSpans = allNewSpans, StartTime = minTime, TotalDuration = maxTime - minTime };
     }
 
-    public void AddLog(ExportLogsServiceRequest request)
+    public virtual void AddLog(ExportLogsServiceRequest request)
     {
         foreach (var resourceLog in request.ResourceLogs)
         {
@@ -161,7 +161,7 @@ public class InMemoryTelemetryStore : ITelemetryStore
         OnTelemetryReceived?.Invoke();
     }
 
-    public void AddMetric(ExportMetricsServiceRequest metric)
+    public virtual void AddMetric(ExportMetricsServiceRequest metric)
     {
         Metrics.Enqueue(metric);
         if (Metrics.Count > MaxItems) Metrics.TryDequeue(out _);

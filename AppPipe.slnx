@@ -6,6 +6,7 @@
     <Project Path="samples/AppPipe.DevHost/AppPipe.DevHost.csproj" />
     <Project Path="samples/BackendWorker/BackendWorker.csproj" />
     <Project Path="samples/FrontendApi/FrontendApi.csproj" />
+    <Project Path="samples/NugetConsumer/NugetConsumer.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AppPipe.Hosting.Tests/AppPipe.Hosting.Tests.csproj" />

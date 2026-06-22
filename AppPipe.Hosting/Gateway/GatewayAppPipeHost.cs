@@ -72,6 +72,7 @@ public class GatewayAppPipeHost
         builder.Services.Insert(0, ServiceDescriptor.Transient<IStartupFilter, TelemetryPortTokenRemoverFilter>());
 
         builder.Services.AddGrpc();
+        builder.Services.AddSingleton<GatewayDiagnosticsService>();
 
         if (configureBuilder != null)
         {
@@ -81,7 +82,15 @@ public class GatewayAppPipeHost
         // If consumer didn't register ITelemetryStore, register default
         if (!builder.Services.Any(x => x.ServiceType == typeof(ITelemetryStore)))
         {
-            builder.Services.AddSingleton<ITelemetryStore, InMemoryTelemetryStore>();
+            var persistenceEnabled = builder.Configuration.GetValue<bool>("Telemetry:PersistenceEnabled", true);
+            if (persistenceEnabled)
+            {
+                builder.Services.AddSingleton<ITelemetryStore, SqliteTelemetryStore>();
+            }
+            else
+            {
+                builder.Services.AddSingleton<ITelemetryStore, InMemoryTelemetryStore>();
+            }
         }
 
         if (topology != null)
@@ -120,6 +129,69 @@ public class GatewayAppPipeHost
             .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
         _app = builder.Build();
+
+        // Gateway Diagnostics Middleware
+        _app.Use(async (context, next) =>
+        {
+            var diagnostics = context.RequestServices.GetRequiredService<GatewayDiagnosticsService>();
+            diagnostics.IncrementActiveRequests();
+            try
+            {
+                await next();
+            }
+            finally
+            {
+                diagnostics.DecrementActiveRequests();
+            }
+        });
+
+        // Basic Authentication Middleware for Dashboard/UI routes
+        _app.Use(async (context, next) =>
+        {
+            var config = context.RequestServices.GetRequiredService<IConfiguration>();
+            var authEnabled = config.GetValue<bool>("Dashboard:BasicAuth:Enabled", false);
+            if (authEnabled)
+            {
+                var path = context.Request.Path;
+                if (path == "/" ||
+                    path.StartsWithSegments("/dashboard") ||
+                    path.StartsWithSegments("/logs") ||
+                    path.StartsWithSegments("/traces") ||
+                    path.StartsWithSegments("/metrics") ||
+                    path.StartsWithSegments("/diagnostics") ||
+                    path.StartsWithSegments("/_blazor"))
+                {
+                    var expectedUsername = config.GetValue<string>("Dashboard:BasicAuth:Username");
+                    var expectedPassword = config.GetValue<string>("Dashboard:BasicAuth:Password");
+
+                    if (!string.IsNullOrEmpty(expectedUsername))
+                    {
+                        var authHeader = context.Request.Headers["Authorization"].ToString();
+                        bool authenticated = false;
+                        if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
+                        {
+                            try
+                            {
+                                var creds = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(authHeader.Substring(6))).Split(':');
+                                if (creds.Length == 2 && creds[0] == expectedUsername && creds[1] == expectedPassword)
+                                {
+                                    authenticated = true;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        if (!authenticated)
+                        {
+                            context.Response.Headers["WWW-Authenticate"] = "Basic realm=\"AppPipe Dashboard\"";
+                            context.Response.StatusCode = 401;
+                            return;
+                        }
+                    }
+                }
+            }
+            await next();
+        });
 
         if (!_app.Environment.IsDevelopment())
         {

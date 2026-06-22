@@ -12,13 +12,16 @@ With AppPipe, you get a beautiful, unified developer dashboard and service disco
 
 ## 🌟 Features
 
-- **📊 OpenTelemetry Collector & Dashboard**: Collects OTLP traces, logs, and metrics in-memory from your services. Displays them in a gorgeous Blazor dashboard (complete with Light/Dark modes, trace waterfall flamegraphs, structured console logs, and metric charts).
+- **📊 OpenTelemetry Collector & Dashboard**: Collects OTLP traces, logs, and metrics. Displays them in a gorgeous Blazor dashboard (complete with Light/Dark modes, trace waterfall flamegraphs, structured console logs, and metric charts).
+- **💾 SQLite Database Persistence**: Telemetry is persistent by default inside a local SQLite database, surviving gateway restarts and IIS application pool recycles.
+- **🔒 Dashboard Security**: Opt-in basic authentication protection for all dashboard and diagnostics routes.
+- **📈 Gateway Diagnostics Panel**: A dedicated diagnostics page showing real-time telemetry ingestion rates, active proxy connections, database sizes, and host system information.
 - **🔄 Unified Gateway & Routing**: Powered by **YARP (Yet Another Reverse Proxy)**, AppPipe hosts a central routing gateway that automatically maps and proxies requests to your backend microservices.
 - **🔌 Dynamic Port Allocation**: Automatically assigns free ports to your applications during local runs or deployment pipelines, preventing port conflict issues.
 - **🏢 Native IIS & systemd Integration**: Out-of-the-box deployment module using `ModularPipelines` that automates publishing, creating AppPools, registering IIS sub-applications, setting environment variables, and handling systemd service setups.
 - **⚡ Dual Render Modes (Resource-Optimized)**:
   - **Interactive (WebSocket-based)**: Real-time, live-updating metrics and traces.
-  - **SSR (Server-Side Rendered)**: WebSockets are disabled to minimize CPU and memory footprint, utilizing native forms and base-relative routing. Perfect for production or restricted IIS host environments.
+  - **SSR (Server-Side Rendered)**: WebSockets are disabled to minimize CPU and memory footprint, utilizing native forms and base-relative HTML pages. Perfect for production or restricted IIS host environments.
 
 ---
 
@@ -132,12 +135,22 @@ builder.Services.AddOpenTelemetry()
 
 ## 🛠️ Configuration
 
-You can customize the dashboard and gateway behavior in your `appsettings.json` or environment variables:
+You can customize the dashboard, security, and persistence behavior in your `appsettings.json` or environment variables:
 
 ```json
 {
   "Dashboard": {
-    "UseWebSockets": false
+    "UseWebSockets": false,
+    "BasicAuth": {
+      "Enabled": true,
+      "Username": "admin",
+      "Password": "MySecretPassword"
+    }
+  },
+  "Telemetry": {
+    "PersistenceEnabled": true,
+    "DatabasePath": "telemetry.db",
+    "MaxDbRecords": 2000
   }
 }
 ```
@@ -145,6 +158,12 @@ You can customize the dashboard and gateway behavior in your `appsettings.json` 
 | Key | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `Dashboard:UseWebSockets` | `bool` | `false` | Set to `true` to enable real-time UI updates via WebSockets. Set to `false` for resource-friendly static HTML rendering. |
+| `Dashboard:BasicAuth:Enabled` | `bool` | `false` | Set to `true` to enable Basic Authentication protection for the dashboard and diagnostics. |
+| `Dashboard:BasicAuth:Username` | `string` | `null` | The username required to log in when Basic Authentication is enabled. |
+| `Dashboard:BasicAuth:Password` | `string` | `null` | The password required to log in when Basic Authentication is enabled. |
+| `Telemetry:PersistenceEnabled` | `bool` | `true` | Set to `true` to enable SQLite telemetry database persistence. Set to `false` for purely in-memory buffer. |
+| `Telemetry:DatabasePath` | `string` | `telemetry.db` | The path to the persistent SQLite database file. |
+| `Telemetry:MaxDbRecords` | `int` | `2000` | Limits database rows retained per telemetry type. |
 
 ### 🔄 Configuring the Gateway via YARP
 AppPipe's gateway binds natively to standard .NET configuration under the `"ReverseProxy"` section. You can define custom routes, clusters, HTTP request properties, rate-limiting, and transforms inside your `appsettings.json`, or programmatically configure them using `.ConfigureGateway()` in `Program.cs`.
@@ -153,14 +172,17 @@ For a complete guide, step-by-step code samples, and auto-generated routing deta
 
 ---
 
-## 💾 Customizing the Telemetry Database
+## 💾 Telemetry Database Persistence & Custom Stores
 
-By default, AppPipe retains telemetry in a circular in-memory buffer ([InMemoryTelemetryStore](AppPipe.Hosting/Gateway/Services/InMemoryTelemetryStore.cs)). For production environments, you can plug in any database (such as SQLite, PostgreSQL, SQL Server, or ClickHouse) by implementing the [ITelemetryStore](AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and registering it:
+By default, AppPipe persists all logs, traces, and metrics in a local SQLite database ([SqliteTelemetryStore](AppPipe.Hosting/Gateway/Services/SqliteTelemetryStore.cs)). This database is automatically created and hydrated on startup.
+
+If you want to disable database persistence or plug in another database (such as PostgreSQL, SQL Server, or ClickHouse), you can implement the [ITelemetryStore](AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and register it:
 
 ```csharp
 builder.ConfigureGateway(gatewayBuilder =>
 {
-    gatewayBuilder.Services.AddSingleton<ITelemetryStore, SqliteTelemetryStore>();
+    // Override the default SQLite persistence with your own database store
+    gatewayBuilder.Services.AddSingleton<ITelemetryStore, MyCustomDbTelemetryStore>();
 });
 ```
 
