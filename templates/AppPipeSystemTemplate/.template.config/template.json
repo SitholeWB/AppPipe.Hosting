@@ -4,7 +4,7 @@
   "classifications": [ "Common", "Console", "Web", "Orchestrator", "Gateway", "Solution" ],
   "name": "AppPipe Gateway System",
   "identity": "AppPipe.Hosting.System.Template",
-  "shortName": "apppipe-system",
+  "shortName": "app-pipe",
   "tags": {
     "language": "C#",
     "type": "project"
@@ -13,5 +13,148 @@
   "preferNameDirectory": true,
   "primaryOutputs": [
     { "path": "AppPipeSystem.sln" }
+  ],
+  "symbols": {
+    "architecture": {
+      "type": "parameter",
+      "dataType": "choice",
+      "defaultValue": "simple",
+      "description": "Choose the architecture pattern for the ApiService.",
+      "choices": [
+        {
+          "choice": "simple",
+          "description": "Scaffolds a simple Minimal API structure."
+        },
+        {
+          "choice": "clean-cqrs",
+          "description": "Scaffolds a Clean Architecture + CQRS API."
+        }
+      ]
+    },
+    "database": {
+      "type": "parameter",
+      "dataType": "choice",
+      "defaultValue": "none",
+      "description": "Choose the database provider for the ApiService.",
+      "choices": [
+        { "choice": "none", "description": "No database context." },
+        { "choice": "sqlite", "description": "SQLite EF Core context." },
+        { "choice": "postgresql", "description": "PostgreSQL EF Core context." },
+        { "choice": "sqlserver", "description": "SQL Server EF Core context." }
+      ]
+    },
+    "frontend": {
+      "type": "parameter",
+      "dataType": "choice",
+      "defaultValue": "blazor",
+      "description": "Choose the frontend web framework.",
+      "choices": [
+        { "choice": "blazor", "description": "Blazor Web App with Server SSR." },
+        { "choice": "htmx", "description": "Razor Pages + HTMX web app." }
+      ]
+    },
+    "auth": {
+      "type": "parameter",
+      "dataType": "choice",
+      "defaultValue": "none",
+      "description": "Choose authentication type.",
+      "choices": [
+        { "choice": "none", "description": "No authentication configured." },
+        { "choice": "jwt", "description": "JWT Bearer authentication on ApiService." }
+      ]
+    },
+    "caching": {
+      "type": "parameter",
+      "dataType": "choice",
+      "defaultValue": "none",
+      "description": "Choose caching provider.",
+      "choices": [
+        { "choice": "none", "description": "No caching configured." },
+        { "choice": "redis", "description": "Redis distributed caching." }
+      ]
+    },
+    "UseSqlite": {
+      "type": "computed",
+      "value": "database == \"sqlite\""
+    },
+    "UsePostgres": {
+      "type": "computed",
+      "value": "database == \"postgresql\""
+    },
+    "UseSqlServer": {
+      "type": "computed",
+      "value": "database == \"sqlserver\""
+    },
+    "UseDatabase": {
+      "type": "computed",
+      "value": "database != \"none\""
+    },
+    "UseBlazor": {
+      "type": "computed",
+      "value": "frontend == \"blazor\""
+    },
+    "UseHtmx": {
+      "type": "computed",
+      "value": "frontend == \"htmx\""
+    },
+    "UseJwtAuth": {
+      "type": "computed",
+      "value": "auth == \"jwt\""
+    },
+    "UseRedis": {
+      "type": "computed",
+      "value": "caching == \"redis\""
+    }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "condition": "(architecture == \"simple\")",
+          "exclude": [
+            "AppPipeSystem.Domain/**",
+            "AppPipeSystem.Application/**",
+            "AppPipeSystem.Infrastructure/**",
+            "AppPipeSystem.CleanApiService/**",
+            "AppPipeSystem.clean.sln"
+          ],
+          "rename": {
+            "AppPipeSystem.simple.sln": "AppPipeSystem.sln"
+          }
+        },
+        {
+          "condition": "(architecture == \"clean-cqrs\")",
+          "exclude": [
+            "AppPipeSystem.ApiService/**",
+            "AppPipeSystem.simple.sln"
+          ],
+          "rename": {
+            "AppPipeSystem.clean.sln": "AppPipeSystem.sln",
+            "AppPipeSystem.CleanApiService/AppPipeSystem.CleanApiService.csproj": "AppPipeSystem.ApiService/AppPipeSystem.ApiService.csproj",
+            "AppPipeSystem.CleanApiService": "AppPipeSystem.ApiService"
+          }
+        },
+        {
+          "condition": "(frontend == \"blazor\")",
+          "exclude": [
+            "AppPipeSystem.HtmxWeb/**"
+          ],
+          "rename": {
+            "AppPipeSystem.BlazorWeb/AppPipeSystem.BlazorWeb.csproj": "AppPipeSystem.Web/AppPipeSystem.Web.csproj",
+            "AppPipeSystem.BlazorWeb": "AppPipeSystem.Web"
+          }
+        },
+        {
+          "condition": "(frontend == \"htmx\")",
+          "exclude": [
+            "AppPipeSystem.BlazorWeb/**"
+          ],
+          "rename": {
+            "AppPipeSystem.HtmxWeb/AppPipeSystem.HtmxWeb.csproj": "AppPipeSystem.Web/AppPipeSystem.Web.csproj",
+            "AppPipeSystem.HtmxWeb": "AppPipeSystem.Web"
+          }
+        }
+      ]
+    }
   ]
 }

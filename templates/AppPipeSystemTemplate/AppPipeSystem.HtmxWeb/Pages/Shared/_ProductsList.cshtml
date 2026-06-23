@@ -1,0 +1,21 @@
+@model AppPipeSystem.Web.Pages.IndexModel
+
+<div class="product-list">
+    @if (Model.Products == null || !Model.Products.Any())
+    {
+        <div class="no-products">No products found. Add one on the right!</div>
+    }
+    else
+    {
+        @foreach (var p in Model.Products)
+        {
+            <div class="product-item">
+                <div class="product-info">
+                    <h3>@p.Name</h3>
+                    <p>ID: @p.Id.ToString().Substring(0, 8)...</p>
+                </div>
+                <div class="product-price">$@p.Price.ToString("F2")</div>
+            </div>
+        }
+    }
+</div>

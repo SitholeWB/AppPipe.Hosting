@@ -2,11 +2,10 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Microsoft.EntityFrameworkCore;
-#if UseRedis
-using System.Text.Json;
-using Microsoft.Extensions.Caching.Distributed;
-#endif
+using AppPipeSystem.Application.Products.Commands;
+using AppPipeSystem.Application.Products.Queries;
+using AppPipeSystem.Application.Abstractions;
+using AppPipeSystem.Infrastructure;
 #if UseJwtAuth
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
@@ -46,30 +45,10 @@ public class Program
             logging.AddOtlpExporter();
         });
 
-        // 4. Configure Database Context
-#if UseSqlite
-        builder.Services.AddDbContext<AppDbContext>(opt =>
-            opt.UseSqlite(builder.Configuration.GetConnectionString("Database") ?? "Data Source=products.db"));
-#elif UsePostgres
-        builder.Services.AddDbContext<AppDbContext>(opt =>
-            opt.UseNpgsql(builder.Configuration.GetConnectionString("Database")));
-#elif UseSqlServer
-        builder.Services.AddDbContext<AppDbContext>(opt =>
-            opt.UseSqlServer(builder.Configuration.GetConnectionString("Database")));
-#else
-        builder.Services.AddDbContext<AppDbContext>(opt =>
-            opt.UseInMemoryDatabase("ProductsDb"));
-#endif
+        // 4. Register Infrastructure services (including CQRS Handlers and Database Context)
+        builder.Services.AddInfrastructure();
 
-        // 5. Configure Caching
-#if UseRedis
-        builder.Services.AddStackExchangeRedisCache(opt =>
-        {
-            opt.Configuration = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-        });
-#endif
-
-        // 6. Configure Authentication
+        // 5. Configure Authentication
 #if UseJwtAuth
         builder.Services.AddAuthentication(opt =>
         {
@@ -100,70 +79,39 @@ public class Program
 #endif
 
         // Initialize Database tables
-        using (var scope = app.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            db.Database.EnsureCreated();
-        }
+        app.RunDatabaseSetup();
 
-        // 7. Mapped Endpoints
+        // 6. Endpoints mapped directly to Handlers (CQRS without MediatR)
         app.MapGet("/", () =>
         {
-            app.Logger.LogInformation("ApiService backend received a request.");
-            return Results.Ok(new { message = "Hello from ApiService" });
+            app.Logger.LogInformation("ApiService clean backend root endpoint hit.");
+            return Results.Ok(new { message = "Hello from clean CQRS ApiService" });
         });
 
-        app.MapGet("/products", async (AppDbContext db
-#if UseRedis
-            , IDistributedCache cache
-#endif
-        ) =>
+        var postProducts = app.MapPost("/products", async (
+            CreateProductCommand command, 
+            ICommandHandler<CreateProductCommand, Guid> handler,
+            CancellationToken ct) =>
         {
-#if UseRedis
-            var cachedData = await cache.GetStringAsync("products-list");
-            if (!string.IsNullOrEmpty(cachedData))
-            {
-                var cachedProducts = JsonSerializer.Deserialize<List<Product>>(cachedData);
-                if (cachedProducts != null)
-                {
-                    return Results.Ok(cachedProducts);
-                }
-            }
-#endif
-
-            var products = await db.Products.ToListAsync();
-
-#if UseRedis
-            var options = new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5)
-            };
-            var serialized = JsonSerializer.Serialize(products);
-            await cache.SetStringAsync("products-list", serialized, options);
-#endif
-
-            return Results.Ok(products);
-        });
-
-        var postProducts = app.MapPost("/products", async (Product product, AppDbContext db
-#if UseRedis
-            , IDistributedCache cache
-#endif
-        ) =>
-        {
-            product.Id = Guid.NewGuid();
-            db.Products.Add(product);
-            await db.SaveChangesAsync();
-
-#if UseRedis
-            await cache.RemoveAsync("products-list");
-#endif
-            return Results.Created($"/products/{product.Id}", product);
+            app.Logger.LogInformation("Creating product: {Name}", command.Name);
+            var id = await handler.HandleAsync(command, ct);
+            return Results.Created($"/products/{id}", new { id });
         });
 
 #if UseJwtAuth
         postProducts.RequireAuthorization();
+#endif
 
+        app.MapGet("/products", async (
+            IQueryHandler<GetProductsQuery, List<ProductDto>> handler,
+            CancellationToken ct) =>
+        {
+            app.Logger.LogInformation("Fetching products list");
+            var products = await handler.HandleAsync(new GetProductsQuery(), ct);
+            return Results.Ok(products);
+        });
+
+#if UseJwtAuth
         app.MapPost("/auth/token", () =>
         {
             var tokenHandler = new JwtSecurityTokenHandler();

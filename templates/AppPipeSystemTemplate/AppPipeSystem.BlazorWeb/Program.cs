@@ -2,6 +2,7 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using AppPipeSystem.Web.Components;
 
 namespace AppPipeSystem.Web;
 
@@ -20,7 +21,7 @@ public class Program
             .WithTracing(tracing => tracing
                 .SetResourceBuilder(resourceBuilder)
                 .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation() // Traces outgoing HTTP calls
+                .AddHttpClientInstrumentation()
                 .AddOtlpExporter())
             .WithMetrics(metrics => metrics
                 .SetResourceBuilder(resourceBuilder)
@@ -36,10 +37,12 @@ public class Program
             logging.AddOtlpExporter();
         });
 
-        // 4. Configure HTTP Client targeting ApiService
+        // 4. Register Blazor Server-Side Rendering (Razor Components)
+        builder.Services.AddRazorComponents();
+
+        // 5. Configure HTTP Client targeting ApiService
         builder.Services.AddHttpClient("ApiService", client =>
         {
-            // The AppPipe framework injects references as services__{Name}__http__0
             var address = builder.Configuration["services:ApiService:http:0"];
             if (!string.IsNullOrEmpty(address))
             {
@@ -49,28 +52,9 @@ public class Program
 
         var app = builder.Build();
 
-        app.MapGet("/", async (IHttpClientFactory factory, ILogger<Program> logger) =>
-        {
-            logger.LogInformation("Web frontend processing request");
-            var client = factory.CreateClient("ApiService");
-            
-            if (client.BaseAddress == null)
-            {
-                return Results.Problem("ApiService address not configured by AppPipe");
-            }
+        app.UseAntiforgery();
 
-            try
-            {
-                var response = await client.GetAsync("");
-                var content = await response.Content.ReadAsStringAsync();
-                return Results.Ok(new { frontend = "Web Frontend success", backend_response = content });
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to call ApiService backend");
-                return Results.Problem("Failed to reach ApiService backend.");
-            }
-        });
+        app.MapRazorComponents<App>();
 
         app.Run();
     }

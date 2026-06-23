@@ -10,6 +10,8 @@
         <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
         <Private>false</Private>
+        <PrivateAssets>All</PrivateAssets>
+        <ExcludeAssets>All</ExcludeAssets>
       </ProjectReference>
     </ItemGroup>
   </Target>
