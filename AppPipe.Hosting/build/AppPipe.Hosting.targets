@@ -22,7 +22,12 @@
     <ItemGroup>
       <!-- Filter out the AppPipe.Hosting library reference itself and any project references that opted out of AppProject -->
       <FilteredProjectReference Include="@(ProjectReference)" Condition="!$([System.String]::new('%(Identity)').Contains('AppPipe.Hosting.csproj')) and '%(ProjectReference.AppProject)' != 'false'" />
-      <ProjectReferenceNames Include="@(FilteredProjectReference->'%(Filename)')" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReferenceNames Include="@(FilteredProjectReference->'%(Filename)')">
+        <ConstantName>$([System.String]::new('%(Filename)').Replace('.', '_').Replace('-', '_'))</ConstantName>
+      </ProjectReferenceNames>
     </ItemGroup>
 
     <!-- Create code lines -->
@@ -32,7 +37,7 @@
       <CodeLines Include="{" />
       <CodeLines Include="    public static class AppPipeProjects" />
       <CodeLines Include="    {" />
-      <CodeLines Include="        public const string %(ProjectReferenceNames.Identity) = &quot;%(ProjectReferenceNames.Identity)&quot;%3B" />
+      <CodeLines Include="        public const string %(ProjectReferenceNames.ConstantName) = &quot;%(ProjectReferenceNames.Identity)&quot;%3B" />
       <CodeLines Include="    }" />
       <CodeLines Include="}" />
     </ItemGroup>

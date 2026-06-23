@@ -103,6 +103,30 @@ A visual dashboard that allows real-time diagnostics:
 
 ---
 
+## 📦 Project Scaffolding Templates
+
+AppPipe provides an installable `.NET template` pack that scaffolds a fully configured multi-project system out of the box.
+
+### 1. Installation
+To install the templates from NuGet, run:
+```bash
+dotnet new install AppPipe.Hosting.Templates
+```
+
+### 2. Usage
+Create a new directory for your microservices solution and scaffold a system solution using:
+```bash
+dotnet new apppipe-system -n MySystem
+```
+
+### 3. Generated Solution Structure
+The template creates a solution containing the following pre-integrated projects:
+* **`MySystem.AppHost`**: The AppPipe gateway reverse proxy and telemetry dashboard. It references the microservices with decoupled configurations to prevent publish file conflicts.
+* **`MySystem.ApiService`**: A backend Minimal API pre-configured to output OpenTelemetry traces, metrics, and logs back to the gateway.
+* **`MySystem.Web`**: A frontend web application that calls the backend `ApiService` using dynamic service discovery environment variables injected by AppHost, pre-instrumented with HttpClient tracing.
+
+---
+
 ## ⚙️ AppPipeHostingResource Fluent Topology Options
 
 ### Project Registration Methods

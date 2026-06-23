@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageId>AppPipe.Hosting.Templates</PackageId>
+    <Version>1.4.3</Version>
+    <Authors>Welcome Bonginhlahla Sithole</Authors>
+    <Description>Template package containing the apppipe-system multi-project solution template for AppPipe.Hosting gateway orchestrator.</Description>
+    <PackageProjectUrl>https://github.com/SitholeWB/AppPipe.Hosting</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/SitholeWB/AppPipe.Hosting</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <PackageOutputPath>AppPipe.Hosting/bin/Release</PackageOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="templates\**" Exclude="templates\**\bin\**;templates\**\obj\**" Pack="true" PackagePath="content" />
+  </ItemGroup>
+
+</Project>

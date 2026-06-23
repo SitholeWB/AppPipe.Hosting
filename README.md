@@ -80,11 +80,35 @@ graph LR
 ---
 
 
-### Install the Nuget Package
+### Install the NuGet Packages
 
+To add the library to an existing project:
 ```bash
 dotnet add package AppPipe.Hosting
 ```
+
+---
+
+## 📦 Project Scaffolding Templates
+
+AppPipe provides a custom `.NET template` pack that scaffolds a fully working multi-project solution structure out of the box (including the AppHost orchestrator, an ApiService backend, and a Web frontend):
+
+### 1. Install the Template Pack
+```bash
+dotnet new install AppPipe.Hosting.Templates
+```
+
+### 2. Scaffold a New System Solution
+Create a new directory for your microservices solution and run:
+```bash
+dotnet new apppipe-system -n MySystem
+```
+
+This generates:
+* **`MySystem.sln`**: The Visual Studio solution file.
+* **`MySystem.AppHost`**: The AppPipe orchestrator and gateway dashboard.
+* **`MySystem.ApiService`**: A backend REST API configured with OpenTelemetry.
+* **`MySystem.Web`**: A frontend web application that calls the backend using dynamic service discovery.
 
 ---
 

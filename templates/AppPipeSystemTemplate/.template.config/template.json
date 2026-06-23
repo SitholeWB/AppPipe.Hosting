@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Welcome Bonginhlahla Sithole",
+  "classifications": [ "Common", "Console", "Web", "Orchestrator", "Gateway", "Solution" ],
+  "name": "AppPipe Gateway System",
+  "identity": "AppPipe.Hosting.System.Template",
+  "shortName": "apppipe-system",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "AppPipeSystem",
+  "preferNameDirectory": true,
+  "primaryOutputs": [
+    { "path": "AppPipeSystem.sln" }
+  ]
+}
