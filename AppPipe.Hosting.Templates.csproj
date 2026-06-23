@@ -17,9 +17,11 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <ContentTargetFolders>content</ContentTargetFolders>
     <PackageOutputPath>AppPipe.Hosting/bin/Release</PackageOutputPath>
+    <PackageReadmeFile>TEMPLATE_README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="TEMPLATE_README.md" Pack="true" PackagePath="" />
     <Content Include="templates\**" Exclude="templates\**\bin\**;templates\**\obj\**" Pack="true" PackagePath="content" />
   </ItemGroup>
 
