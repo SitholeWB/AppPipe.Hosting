@@ -18,6 +18,8 @@
     <ContentTargetFolders>content</ContentTargetFolders>
     <PackageOutputPath>AppPipe.Hosting/bin/Release</PackageOutputPath>
     <PackageReadmeFile>TEMPLATE_README.md</PackageReadmeFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
 
   <ItemGroup>

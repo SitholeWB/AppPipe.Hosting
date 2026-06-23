@@ -11,4 +11,5 @@
     <Project Path="tests/AppPipe.Hosting.Tests/AppPipe.Hosting.Tests.csproj" />
   </Folder>
   <Project Path="AppPipe.Hosting\AppPipe.Hosting.csproj" />
+  <Project Path="AppPipe.Hosting.Templates.csproj" />
 </Solution>

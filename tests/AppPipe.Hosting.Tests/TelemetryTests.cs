@@ -176,8 +176,23 @@ public class TelemetryTests
 
             store1.AddLog(logRequest);
 
-            // Wait a moment for background task to complete
-            await Task.Delay(200);
+            // Wait for background task to write to SQLite DB (up to 5 seconds)
+            var startTime = DateTime.UtcNow;
+            var databaseHasLogs = false;
+            while ((DateTime.UtcNow - startTime).TotalSeconds < 5)
+            {
+                using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}");
+                await conn.OpenAsync();
+                using var cmd = new Microsoft.Data.Sqlite.SqliteCommand("SELECT COUNT(*) FROM Logs", conn);
+                var count = (long)(await cmd.ExecuteScalarAsync() ?? 0L);
+                if (count > 0)
+                {
+                    databaseHasLogs = true;
+                    break;
+                }
+                await Task.Delay(50);
+            }
+            Assert.True(databaseHasLogs, "Log was not written to database in time.");
 
             Assert.Single(store1.Logs);
         }
@@ -215,8 +230,23 @@ public class TelemetryTests
 
             store3.AddLog(logRequest);
 
-            // Wait a moment for background task to commit and prune
-            await Task.Delay(300);
+            // Wait for background task to commit and prune (up to 5 seconds)
+            var startTimePrune = DateTime.UtcNow;
+            var databaseIsPruned = false;
+            while ((DateTime.UtcNow - startTimePrune).TotalSeconds < 5)
+            {
+                using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbFile}");
+                await conn.OpenAsync();
+                using var cmd = new Microsoft.Data.Sqlite.SqliteCommand("SELECT COUNT(*) FROM Logs", conn);
+                var count = (long)(await cmd.ExecuteScalarAsync() ?? 0L);
+                if (count <= 3 && count > 0)
+                {
+                    databaseIsPruned = true;
+                    break;
+                }
+                await Task.Delay(50);
+            }
+            Assert.True(databaseIsPruned, "Logs were not pruned in time.");
 
             // Create a fourth store instance to check pruned database contents
             var store4 = new SqliteTelemetryStore(config);
@@ -228,6 +258,10 @@ public class TelemetryTests
         GC.Collect();
         GC.WaitForPendingFinalizers();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        if (File.Exists(dbFile)) File.Delete(dbFile);
+        try
+        {
+            if (File.Exists(dbFile)) File.Delete(dbFile);
+        }
+        catch { }
     }
 }

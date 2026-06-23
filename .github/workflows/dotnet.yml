@@ -21,10 +21,10 @@ jobs:
         include-prerelease: true
         
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore AppPipe.slnx
       
     - name: Build
-      run: dotnet build --no-restore -c Release
+      run: dotnet build AppPipe.slnx --no-restore -c Release
       
     - name: Test
-      run: dotnet test --no-build -c Release --verbosity normal
+      run: dotnet test AppPipe.slnx --no-build -c Release --verbosity normal
