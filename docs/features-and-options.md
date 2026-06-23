@@ -296,7 +296,7 @@ internal class Program
         else
         {
             // Running locally for development
-            var runner = new DevHostRunner(app);
+            var runner = new AppPipeDevHostRunner(app);
             await runner.RunAsync();
         }
     }

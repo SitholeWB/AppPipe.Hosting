@@ -162,7 +162,7 @@ else if (Environment.GetEnvironmentVariable("APP_POOL_ID") != null)
 }
 else
 {
-    var runner = new DevHostRunner(app);
+    var runner = new AppPipeDevHostRunner(app);
     await runner.RunAsync();
 }
 ```
