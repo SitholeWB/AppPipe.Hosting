@@ -7,6 +7,8 @@ namespace AppPipe.Hosting;
 public class AppPipeDevHostRunner
 {
     private readonly AppPipeHostingApp _app;
+    private readonly List<Process> _childProcesses = [];
+    private WindowsJobObject? _jobObject;
 
     public AppPipeDevHostRunner(AppPipeHostingApp app)
     {
@@ -16,6 +18,16 @@ public class AppPipeDevHostRunner
     public async Task RunAsync()
     {
         Console.WriteLine("AppPipe.NET DevHost Starting...");
+
+        // Ensure all child processes are terminated when this host exits.
+        // ProcessExit covers graceful exits (normal stop, Ctrl+C via VS, unhandled exceptions).
+        // CancelKeyPress covers Ctrl+C from a terminal.
+        // On Windows, the Job Object additionally covers hard kills (TerminateProcess from IDE/Task Manager).
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => Shutdown();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; Shutdown(); };
+
+        if (OperatingSystem.IsWindows())
+            _jobObject = new WindowsJobObject();
 
         // 1. Generate YARP Config
         var yarpConfig = new System.Text.StringBuilder();
@@ -55,9 +67,24 @@ public class AppPipeDevHostRunner
             tasks.Add(StartResourceAsync(resource, ports.TelemetryPort));
         }
 
-        // Wait for all to exit (which usually means forever, or until developer stops it)
         await Task.WhenAll(tasks);
         await gatewayHost.StopAsync();
+
+        if (OperatingSystem.IsWindows())
+            _jobObject?.Dispose();
+    }
+
+    private void Shutdown()
+    {
+        foreach (var process in _childProcesses)
+        {
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch { /* process may have already exited */ }
+        }
     }
 
     private async Task StartResourceAsync(AppPipeHostingResource resource, int gatewayPort)
@@ -68,26 +95,18 @@ public class AppPipeDevHostRunner
             await WaitForPortAsync(dep.AssignedPort);
         }
 
-        var envVars = new Dictionary<string, string>();
+        var envVars = new Dictionary<string, string>
+        {
+            ["ASPNETCORE_URLS"] = $"http://localhost:{resource.AssignedPort}",
+            ["PORT"] = resource.AssignedPort.ToString(),
+            ["OTEL_EXPORTER_OTLP_ENDPOINT"] = $"http://localhost:{gatewayPort}"
+        };
 
-        // Inject loopback ports
-        envVars["ASPNETCORE_URLS"] = $"http://localhost:{resource.AssignedPort}";
-        envVars["PORT"] = resource.AssignedPort.ToString(); // For Node.js/Executables
-
-        // Inject reference service discovery
         foreach (var reference in resource.References)
-        {
             envVars[$"services__{reference.Name}__http__0"] = $"http://localhost:{reference.AssignedPort}";
-        }
 
-        // Inject OTel to internal Gateway Telemetry Port
-        envVars["OTEL_EXPORTER_OTLP_ENDPOINT"] = $"http://localhost:{gatewayPort}";
-
-        // Inject custom environment variables
         foreach (var env in resource.EnvironmentVariables)
-        {
             envVars[env.Key] = env.Value;
-        }
 
         Console.WriteLine($"Starting {resource.Name} on port {resource.AssignedPort}...");
 
@@ -102,7 +121,7 @@ public class AppPipeDevHostRunner
         {
             startInfo.FileName = "dotnet";
             startInfo.Arguments = $"run --no-launch-profile --project {proj.ProjectPath}";
-            startInfo.WorkingDirectory = System.IO.Path.GetDirectoryName(proj.ProjectPath);
+            startInfo.WorkingDirectory = Path.GetDirectoryName(proj.ProjectPath);
         }
         else if (resource is ExecutableAppPipeHostingResource exec)
         {
@@ -117,33 +136,36 @@ public class AppPipeDevHostRunner
         }
 
         foreach (var env in envVars)
-        {
             startInfo.EnvironmentVariables[env.Key] = env.Value;
-        }
 
-        // Prevent Visual Studio / IDE injected hosting startup assemblies from crashing child processes
+        // Prevent IDE-injected startup assemblies from crashing child processes
         startInfo.EnvironmentVariables.Remove("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES");
 
         var process = new Process { StartInfo = startInfo };
+        _childProcesses.Add(process);
 
-        process.OutputDataReceived += (sender, e) =>
+        process.OutputDataReceived += (_, e) =>
         {
             if (!string.IsNullOrEmpty(e.Data))
                 Console.WriteLine($"[{resource.Name}] {e.Data}");
         };
-        process.ErrorDataReceived += (sender, e) =>
+        process.ErrorDataReceived += (_, e) =>
         {
             if (!string.IsNullOrEmpty(e.Data))
                 Console.Error.WriteLine($"[{resource.Name} ERR] {e.Data}");
         };
 
         process.Start();
+
+        if (OperatingSystem.IsWindows())
+            _jobObject?.Add(process);
+
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
         await process.WaitForExitAsync();
     }
 
-    private int GetFreePort()
+    private static int GetFreePort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -153,7 +175,7 @@ public class AppPipeDevHostRunner
         return port;
     }
 
-    private async Task WaitForPortAsync(int port)
+    private static async Task WaitForPortAsync(int port)
     {
         while (true)
         {
@@ -161,7 +183,7 @@ public class AppPipeDevHostRunner
             {
                 using var client = new TcpClient();
                 await client.ConnectAsync(IPAddress.Loopback, port);
-                break;
+                return;
             }
             catch
             {
