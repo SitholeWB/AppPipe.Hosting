@@ -174,7 +174,44 @@ builder.Services.AddOpenTelemetry()
 
 ---
 
-## 🛠️ Configuration
+## 🖥️ Accessing the Dashboard
+
+> [!IMPORTANT]
+> You must start the **AppHost project** (e.g. `MySystem.AppHost`) — not one of your individual microservices.
+
+Once the AppHost is running, open your browser and navigate to:
+
+```
+http://localhost:7001/dashboard
+```
+
+The dashboard port `7001` is the default gateway port. If you have changed it in your `appsettings.json`, use the port you configured instead.
+
+### What you'll see
+
+| Page | URL | Description |
+| :--- | :--- | :--- |
+| **Resources** | `/dashboard` | Service health, latency percentiles (P50/P95/P99), error rates, and data retention |
+| **Console Logs** | `/logs` | Structured logs grouped by service with severity filters, full-text search, and CSV export |
+| **Traces** | `/traces` | Distributed traces with waterfall timeline, correlated logs, and slow-trace detection |
+| **Metrics** | `/metrics` | Live metric charts grouped by service with min/max/avg aggregation |
+| **Service Map** | `/service-map` | SVG dependency graph showing service-to-service call flows |
+
+### Starting with the template
+
+If you used the AppPipe template:
+
+```bash
+# In Visual Studio — set the AppHost project as the startup project and press F5
+# Or via CLI:
+cd MySystem.AppHost
+dotnet run
+```
+
+Then open **http://localhost:7001/dashboard** in your browser.
+
+---
+
 
 You can customize the dashboard, security, and persistence behavior in your `appsettings.json` or environment variables:
 
@@ -198,7 +235,7 @@ You can customize the dashboard, security, and persistence behavior in your `app
 
 | Key | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `Dashboard:UseWebSockets` | `bool` | `false` | Set to `true` to enable real-time UI updates via WebSockets. Set to `false` for resource-friendly static HTML rendering. |
+| `Dashboard:UseWebSockets` | `bool` | `false` | Controls live push-updates: when `true`, the dashboard subscribes to `OnTelemetryReceived` events and updates in real time without polling. The dashboard is always fully interactive regardless of this setting. |
 | `Dashboard:BasicAuth:Enabled` | `bool` | `false` | Set to `true` to enable Basic Authentication protection for the dashboard and diagnostics. |
 | `Dashboard:BasicAuth:Username` | `string` | `null` | The username required to log in when Basic Authentication is enabled. |
 | `Dashboard:BasicAuth:Password` | `string` | `null` | The password required to log in when Basic Authentication is enabled. |

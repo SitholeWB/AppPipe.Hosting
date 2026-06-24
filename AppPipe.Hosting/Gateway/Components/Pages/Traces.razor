@@ -1,81 +1,149 @@
 @page "/traces"
 @using AppPipe.Hosting
 @using Microsoft.Extensions.Configuration
+@using Microsoft.JSInterop
 @inject ITelemetryStore Store
 @inject NavigationManager Nav
 @inject IConfiguration Config
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Traces - AppPipe.NET</PageTitle>
 
 <div class="page-container">
+    <!-- Header -->
     <div class="page-header">
-        <h1>Traces</h1>
+        <div class="header-left">
+            <h1>Traces</h1>
+            <span class="retention-badge">@Store.Traces.Count <span class="ret-sep">/</span> 500</span>
+        </div>
         <div class="header-actions">
-            <form method="get" action="@($"{Nav.BaseUri}traces")" class="search-form">
-                <div class="search-input-wrapper">
-                    <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                    <input type="text" name="search" value="@SearchQuery" placeholder="Filter by trace ID, span, service..." class="aspire-input" />
-                </div>
-                <button type="submit" class="aspire-btn primary">Filter</button>
-                @if (!string.IsNullOrWhiteSpace(SearchQuery))
+            <div class="search-wrapper">
+                <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                <input type="text" @bind="searchTerm" @bind:event="oninput" @bind:after="ResetPage"
+                       placeholder="Search traces..." class="aspire-input search-input" />
+                @if (!string.IsNullOrEmpty(searchTerm))
                 {
-                    <a href="@($"{Nav.BaseUri}traces")" class="aspire-btn" style="text-decoration:none;">Clear</a>
+                    <button class="clear-search-btn" @onclick="() => { searchTerm = string.Empty; currentPage = 1; }"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
                 }
-            </form>
-            <a href="@($"{Nav.BaseUri}traces?search={SearchQuery}")" class="aspire-btn refresh-btn">
-                <svg class="refresh-icon" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                Refresh
-            </a>
+            </div>
+            <button class="aspire-btn danger-btn" @onclick="ClearTraces">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                Clear
+            </button>
         </div>
     </div>
 
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <!-- Service Pills -->
+        <div class="filter-group">
+            <span class="filter-label">Service</span>
+            <div class="pill-row">
+                <button class="pill @(selectedService == null ? "active" : "")" @onclick="() => SetService(null)">All</button>
+                @foreach (var svc in Store.GetServiceNames())
+                {
+                    var s = svc;
+                    <button class="pill @(selectedService == s ? "active" : "")" @onclick="() => SetService(s)">@s</button>
+                }
+            </div>
+        </div>
+
+        <!-- Status Pills -->
+        <div class="filter-group">
+            <span class="filter-label">Status</span>
+            <div class="pill-row">
+                <button class="pill @(selectedStatus == "All" ? "active" : "")" @onclick='() => SetStatus("All")'>All</button>
+                <button class="pill @(selectedStatus == "Success" ? "active" : "") success-pill" @onclick='() => SetStatus("Success")'>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Success
+                </button>
+                <button class="pill @(selectedStatus == "Error" ? "active" : "") error-pill" @onclick='() => SetStatus("Error")'>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg> Error
+                </button>
+            </div>
+        </div>
+
+        <!-- Slow Trace Pills -->
+        <div class="filter-group">
+            <span class="filter-label">Speed</span>
+            <div class="pill-row">
+                <button class="pill @(slowThreshold == 0 ? "active" : "")" @onclick="() => SetSlow(0)">All</button>
+                <button class="pill @(slowThreshold == 200 ? "active" : "") slow-pill" @onclick="() => SetSlow(200)">> 200ms</button>
+                <button class="pill @(slowThreshold == 500 ? "active" : "") slow-pill" @onclick="() => SetSlow(500)">> 500ms</button>
+                <button class="pill @(slowThreshold == 1000 ? "active" : "") slow-pill" @onclick="() => SetSlow(1000)">> 1s</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result count + pagination -->
+    <div class="results-bar">
+        <span class="result-count">
+            Showing <strong>@PagedTraces().Count()</strong> of <strong>@FilteredTraces().Count()</strong> traces
+        </span>
+        @if (TotalPages > 1)
+        {
+            <div class="pagination">
+                <button class="aspire-btn page-btn" disabled="@(currentPage <= 1)" @onclick="PrevPage">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg> Prev
+                </button>
+                <span class="page-info">Page @currentPage of @TotalPages</span>
+                <button class="aspire-btn page-btn" disabled="@(currentPage >= TotalPages)" @onclick="NextPage">
+                    Next <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+                </button>
+            </div>
+        }
+    </div>
+
+    <!-- Trace List -->
     <div class="traces-list">
-        @if (!GetFilteredTraces().Any())
+        @if (!FilteredTraces().Any())
         {
             <div class="empty-state">
                 <svg class="empty-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
                 <h3>No Traces Found</h3>
-                <p>Configure your microservices to send OpenTelemetry traces to this dashboard.</p>
+                <p>@(Store.Traces.IsEmpty ? "Waiting for traces from your services..." : "No traces match the current filters.")</p>
             </div>
         }
         else
         {
-            @foreach (var trace in GetFilteredTraces())
+            @foreach (var trace in PagedTraces())
             {
                 var rootSpan = trace.RootSpan;
                 var name = rootSpan?.Name ?? "Unknown Request";
                 var service = rootSpan?.ServiceName ?? "Unknown";
                 var isError = trace.HasError;
-                var durationStr = trace.TotalDuration.TotalMilliseconds < 1 ? "< 1 ms" : $"{(int)trace.TotalDuration.TotalMilliseconds} ms";
-                
-                var method = rootSpan?.HttpMethod ?? "GET";
-                var methodLower = method.ToLowerInvariant();
-                var methodClass = methodLower switch
-                {
-                    "get" => "get",
-                    "post" => "post",
-                    "put" => "put",
-                    "delete" => "delete",
-                    _ => "other"
-                };
-
+                var durationMs = trace.TotalDuration.TotalMilliseconds;
+                var durationStr = durationMs < 1 ? "< 1 ms" : $"{(int)durationMs} ms";
+                var method = rootSpan?.HttpMethod ?? "";
+                var methodClass = (method.ToLowerInvariant()) switch { "get" => "get", "post" => "post", "put" => "put", "delete" => "delete", _ => "other" };
                 var urlPath = rootSpan?.UrlPath ?? name;
-                var isPreExpanded = SearchQueryAndExpandMatch(trace.TraceId);
+                var isSlow1000 = durationMs >= 1000;
+                var isSlow500 = durationMs >= 500 && !isSlow1000;
+                var cardBorder = isSlow1000 ? "border-left: 3px solid #d97706;" : isSlow500 ? "border-left: 3px solid rgba(217,119,6,0.4);" : "";
+                var isExpanded = expandedTraceId == trace.TraceId;
 
-                <details class="trace-card" open="@(isPreExpanded ? "true" : null)">
-                    <summary class="trace-summary">
+                <details class="trace-card" style="@cardBorder" open="@(isExpanded ? "true" : null)">
+                    <summary class="trace-summary" @onclick="() => expandedTraceId = isExpanded ? null : trace.TraceId">
                         <div class="trace-meta">
                             <span class="trace-time">@trace.StartTime.ToString("HH:mm:ss.fff")</span>
                             <div class="trace-name-container">
-                                <span class="trace-method @methodClass">@method</span>
+                                @if (!string.IsNullOrEmpty(method))
+                                {
+                                    <span class="trace-method @methodClass">@method</span>
+                                }
                                 <span class="trace-path" title="@urlPath">@urlPath</span>
                             </div>
                             <span class="trace-service-badge">@service</span>
                         </div>
                         <div class="trace-stats">
-                            <div class="trace-duration-badge" title="Total Duration">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:0.2rem;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                            @if (isSlow1000) {
+                                <span class="slow-badge">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                                    Slow
+                                </span>
+                            }
+                            <div class="trace-duration-badge">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                                 @durationStr
                             </div>
                             @if (isError)
@@ -84,14 +152,24 @@
                             }
                             else
                             {
-                                <span class="trace-status-badge success">Success</span>
+                                <span class="trace-status-badge success">OK</span>
                             }
-                            <svg class="chevron-icon" viewBox="0 0 24 24">
-                                <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/>
-                            </svg>
+                            <button class="copy-btn" title="Copy Trace ID" @onclick:stopPropagation="true"
+                                    @onclick="() => CopyTraceId(trace.TraceId)">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                            </button>
+                            <svg class="chevron-icon" viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
                         </div>
                     </summary>
+
                     <div class="trace-details-content">
+                        <!-- Trace ID -->
+                        <div class="trace-id-row">
+                            <span class="detail-label">Trace ID</span>
+                            <span class="font-mono trace-id-val">@trace.TraceId</span>
+                        </div>
+
+                        <!-- Waterfall -->
                         <div class="waterfall-container">
                             <h4>Waterfall Timeline</h4>
                             <div class="waterfall-tree">
@@ -102,450 +180,198 @@
                                 }
                             </div>
                         </div>
+
+                        <!-- Correlated Logs -->
+                        <div class="correlated-logs">
+                            <h4>Correlated Logs</h4>
+                            @{
+                                var corrLogs = Store.Logs
+                                    .Where(l => !string.IsNullOrEmpty(l.TraceId) && l.TraceId == trace.TraceId)
+                                    .OrderBy(l => l.Timestamp)
+                                    .ToList();
+                            }
+                            @if (!corrLogs.Any())
+                            {
+                                <p class="no-corr-logs">No logs correlated to this trace.</p>
+                            }
+                            else
+                            {
+                                <table class="corr-log-table">
+                                    <thead><tr><th>Time</th><th>Level</th><th>Service</th><th>Message</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var cl in corrLogs)
+                                        {
+                                            var sev = GetSevClass(cl.Severity);
+                                            <tr>
+                                                <td class="font-mono">@cl.Timestamp.ToString("HH:mm:ss.fff")</td>
+                                                <td><span class="sev-badge @sev">@cl.Severity</span></td>
+                                                <td>@cl.ServiceName</td>
+                                                <td class="corr-msg">@cl.Message</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
                     </div>
                 </details>
             }
         }
     </div>
+
+    @if (TotalPages > 1)
+    {
+        <div class="pagination bottom-pagination">
+            <button class="aspire-btn page-btn" disabled="@(currentPage <= 1)" @onclick="PrevPage">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg> Prev
+            </button>
+            <span class="page-info">Page @currentPage of @TotalPages</span>
+            <button class="aspire-btn page-btn" disabled="@(currentPage >= TotalPages)" @onclick="NextPage">
+                Next <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+            </button>
+        </div>
+    }
 </div>
 
 <style>
-    .page-container {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-    }
-    
-    .page-header h1 {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin: 0;
-    }
-    
-    .header-actions {
-        display: flex;
-        gap: 1rem;
-    }
-    
-    .search-form {
-        display: flex;
-        gap: 0.5rem;
-        margin: 0;
-        align-items: center;
-    }
-    
-    .search-input-wrapper {
-        position: relative;
-        display: flex;
-        align-items: center;
-    }
-    
-    .search-icon {
-        position: absolute;
-        left: 10px;
-        width: 18px;
-        height: 18px;
-        fill: var(--text-muted);
-        pointer-events: none;
-    }
-    
-    .aspire-input {
-        background: var(--item-bg);
-        border: 1px solid var(--border-color);
-        color: var(--text-main);
-        padding: 0.5rem 0.75rem 0.5rem 2.25rem;
-        border-radius: 6px;
-        font-family: inherit;
-        font-size: 0.9rem;
-        width: 280px;
-        transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    
-    .aspire-input:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-    }
-    
-    .aspire-btn {
-        background: var(--item-bg);
-        border: 1px solid var(--border-color);
-        color: var(--text-main);
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 500;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        transition: background-color 0.15s, border-color 0.15s;
-    }
-    
-    .aspire-btn:hover {
-        background: var(--panel-bg-hover);
-        border-color: var(--border-hover);
-    }
-    
-    .aspire-btn.primary {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent);
-    }
-    
-    .aspire-btn.primary:hover {
-        opacity: 0.9;
-    }
-    
-    .refresh-btn {
-        text-decoration: none;
-    }
-    
-    .refresh-icon {
-        width: 16px;
-        height: 16px;
-        fill: currentColor;
-    }
-    
-    .empty-state {
-        text-align: center;
-        padding: 4rem 2rem;
-        background: var(--panel-bg);
-        border: 1px dashed var(--border-color);
-        border-radius: 8px;
-        color: var(--text-muted);
-    }
-    
-    .empty-icon {
-        width: 48px;
-        height: 48px;
-        fill: var(--text-muted);
-        margin-bottom: 1rem;
-    }
-    
-    .empty-state h3 {
-        margin: 0 0 0.5rem 0;
-        color: var(--text-main);
-        font-size: 1.2rem;
-    }
-    
-    .empty-state p {
-        margin: 0;
-        font-size: 0.9rem;
-    }
-    
-    .traces-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-    
-    .trace-card {
-        background: var(--panel-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        transition: box-shadow 0.15s, border-color 0.15s;
-    }
-    
-    .trace-card:hover {
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border-color: var(--border-hover);
-    }
-    
-    .trace-summary {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem 1.25rem;
-        cursor: pointer;
-        user-select: none;
-        list-style: none;
-    }
-    
-    .trace-summary::-webkit-details-marker {
-        display: none;
-    }
-    
-    .trace-meta {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        flex: 1;
-        min-width: 0;
-    }
-    
-    .trace-time {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        white-space: nowrap;
-    }
-    
-    .trace-name-container {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        flex: 1;
-        min-width: 0;
-    }
-    
-    .trace-method {
-        font-size: 0.75rem;
-        font-weight: 700;
-        padding: 0.2rem 0.5rem;
-        border-radius: 4px;
-        text-transform: uppercase;
-        font-family: 'Consolas', 'Courier New', monospace;
-        min-width: 48px;
-        text-align: center;
-    }
-    
-    .trace-method.get { background: rgba(2, 132, 199, 0.1); color: #0284c7; }
-    .trace-method.post { background: rgba(22, 163, 74, 0.1); color: #16a34a; }
-    .trace-method.put { background: rgba(217, 119, 6, 0.1); color: #d97706; }
-    .trace-method.delete { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+    .page-container { display: flex; flex-direction: column; height: 100%; gap: 1rem; }
+
+    .page-header { display: flex; justify-content: space-between; align-items: center; }
+    .header-left { display: flex; align-items: center; gap: 0.75rem; }
+    .page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+    .retention-badge { font-size: 0.8rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 20px; background: var(--panel-bg-hover); color: var(--text-muted); font-family: 'Consolas', monospace; }
+    .ret-sep { opacity: 0.4; }
+    .header-actions { display: flex; gap: 0.6rem; align-items: center; }
+
+    .aspire-btn { background: var(--item-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem 0.85rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; font-family: inherit; transition: background 0.15s, border-color 0.15s; display: inline-flex; align-items: center; gap: 0.35rem; }
+    .aspire-btn:hover { background: var(--panel-bg-hover); border-color: var(--border-hover); }
+    .aspire-btn:disabled { opacity: 0.4; cursor: default; }
+    .danger-btn { border-color: var(--badge-error-text); color: var(--badge-error-text); }
+    .danger-btn:hover { background: var(--badge-error-bg); }
+
+    .search-wrapper { position: relative; display: flex; align-items: center; }
+    .search-icon { position: absolute; left: 10px; width: 16px; height: 16px; fill: var(--text-muted); pointer-events: none; }
+    .aspire-input { background: var(--item-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem 0.75rem 0.4rem 2.1rem; border-radius: 6px; font-family: inherit; font-size: 0.875rem; transition: border-color 0.15s; }
+    .search-input { width: 260px; }
+    .aspire-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(2,132,199,0.12); }
+    .clear-search-btn { position: absolute; right: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; padding: 0.2rem; }
+    .clear-search-btn:hover { color: var(--text-main); }
+
+    .filter-bar { display: flex; flex-direction: column; gap: 0.6rem; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem 1rem; }
+    .filter-group { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    .filter-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); min-width: 50px; }
+    .pill-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .pill { background: var(--item-bg); border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.2rem 0.65rem; border-radius: 20px; cursor: pointer; font-size: 0.8rem; font-weight: 500; font-family: inherit; transition: all 0.15s; white-space: nowrap; }
+    .pill:hover { background: var(--panel-bg-hover); color: var(--text-main); }
+    .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .success-pill.active { background: var(--badge-success-bg); border-color: var(--badge-success-text); color: var(--badge-success-text); }
+    .error-pill.active { background: var(--badge-error-bg); border-color: var(--badge-error-text); color: var(--badge-error-text); }
+    .slow-pill.active { background: rgba(234,179,8,0.15); border-color: #ca8a04; color: #ca8a04; }
+
+    .results-bar { display: flex; justify-content: space-between; align-items: center; }
+    .result-count { font-size: 0.85rem; color: var(--text-muted); }
+    .result-count strong { color: var(--text-main); }
+    .pagination { display: flex; align-items: center; gap: 0.5rem; }
+    .page-btn { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
+    .page-info { font-size: 0.82rem; color: var(--text-muted); }
+    .bottom-pagination { justify-content: center; margin-top: 0.25rem; }
+
+    .traces-list { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    .trace-card { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; transition: box-shadow 0.15s, border-color 0.15s; }
+    .trace-card:hover { box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-color: var(--border-hover); }
+
+    .trace-summary { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; cursor: pointer; user-select: none; list-style: none; }
+    .trace-summary::-webkit-details-marker { display: none; }
+    .trace-meta { display: flex; align-items: center; gap: 0.85rem; flex: 1; min-width: 0; }
+    .trace-time { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; font-family: 'Consolas', monospace; }
+    .trace-name-container { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+    .trace-method { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; text-transform: uppercase; font-family: 'Consolas', monospace; white-space: nowrap; }
+    .trace-method.get { background: rgba(2,132,199,0.1); color: #0284c7; }
+    .trace-method.post { background: rgba(22,163,74,0.1); color: #16a34a; }
+    .trace-method.put { background: rgba(217,119,6,0.1); color: #d97706; }
+    .trace-method.delete { background: rgba(220,38,38,0.1); color: #dc2626; }
     .trace-method.other { background: var(--panel-bg-hover); color: var(--text-muted); }
-    
-    .trace-path {
-        font-weight: 600;
-        font-size: 0.95rem;
-        color: var(--text-main);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    
-    .trace-service-badge {
-        font-size: 0.8rem;
-        background: var(--panel-bg-hover);
-        color: var(--text-muted);
-        padding: 0.2rem 0.5rem;
-        border-radius: 4px;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-    
-    .trace-stats {
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
-        margin-left: 1rem;
-    }
-    
-    .trace-duration-badge {
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-        font-family: 'Consolas', 'Courier New', monospace;
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: var(--text-main);
-    }
-    
-    .trace-status-badge {
-        font-size: 0.8rem;
-        font-weight: 600;
-        padding: 0.2rem 0.5rem;
-        border-radius: 4px;
-    }
-    
-    .trace-status-badge.success {
-        background: var(--badge-success-bg);
-        color: var(--badge-success-text);
-    }
-    
-    .trace-status-badge.error {
-        background: var(--badge-error-bg);
-        color: var(--badge-error-text);
-    }
-    
-    .chevron-icon {
-        width: 20px;
-        height: 20px;
-        fill: var(--text-muted);
-        transition: transform 0.2s ease-in-out;
-    }
-    
-    .trace-card[open] .chevron-icon {
-        transform: rotate(180deg);
-    }
-    
-    .trace-details-content {
-        padding: 1.25rem;
-        border-top: 1px solid var(--border-color);
-        background: var(--bg-color);
-    }
-    
-    .waterfall-container {
-        padding: 0.5rem;
-    }
-    
-    .waterfall-container h4 {
-        margin: 0 0 1rem 0;
-        font-size: 1rem;
-        font-weight: 600;
-        color: var(--text-main);
-    }
-    
-    .waterfall-tree {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    
-    .span-node {
-        position: relative;
-    }
-    
-    .span-details-card {
-        background: var(--item-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        overflow: hidden;
-        transition: border-color 0.15s;
-    }
-    
-    .span-details-card:hover {
-        border-color: var(--border-hover);
-    }
-    
-    .span-summary {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem 0.75rem;
-        cursor: pointer;
-        user-select: none;
-        list-style: none;
-    }
-    
-    .span-summary::-webkit-details-marker {
-        display: none;
-    }
-    
-    .span-summary-left {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-weight: 500;
-        font-size: 0.85rem;
-        min-width: 0;
-        flex: 1;
-    }
-    
-    .span-name {
-        color: var(--text-main);
-        font-weight: 600;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    
-    .span-service-badge {
-        font-size: 0.75rem;
-        background: var(--panel-bg-hover);
-        padding: 0.1rem 0.35rem;
-        border-radius: 4px;
-        color: var(--text-muted);
-        white-space: nowrap;
-    }
-    
-    .span-summary-right {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        width: 45%;
-        margin-left: 1rem;
-    }
-    
-    .span-duration {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        min-width: 65px;
-        text-align: right;
-        font-family: 'Consolas', 'Courier New', monospace;
-    }
-    
-    .span-timeline-outer {
-        flex: 1;
-        height: 10px;
-        background: rgba(0, 0, 0, 0.05);
-        border-radius: 5px;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    [data-theme="dark"] .span-timeline-outer {
-        background: rgba(255, 255, 255, 0.05);
-    }
-    
-    .span-timeline-inner {
-        position: absolute;
-        height: 100%;
-        border-radius: 5px;
-        top: 0;
-    }
-    
-    .span-content {
-        padding: 0.75rem;
-        background: var(--panel-bg-hover);
-        border-top: 1px solid var(--border-color);
-        font-size: 0.8rem;
-    }
-    
-    .span-info-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 0.5rem;
-    }
-    
-    .span-grid-full {
-        grid-column: span 2;
-    }
-    
-    .method-badge {
-        background: var(--badge-info-bg);
-        color: var(--badge-info-text);
-        padding: 0.1rem 0.35rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        font-family: 'Consolas', 'Courier New', monospace;
-    }
-    
-    .font-mono { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.85rem; }
-    .status-badge {
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 0.1rem 0.35rem;
-        border-radius: 4px;
-    }
-    .status-badge.success {
-        background: var(--badge-success-bg);
-        color: var(--badge-success-text);
-    }
-    .status-badge.error {
-        background: var(--badge-error-bg);
-        color: var(--badge-error-text);
-    }
+    .trace-path { font-weight: 600; font-size: 0.92rem; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .trace-service-badge { font-size: 0.78rem; background: var(--panel-bg-hover); color: var(--text-muted); padding: 0.15rem 0.5rem; border-radius: 4px; white-space: nowrap; }
+    .trace-stats { display: flex; align-items: center; gap: 1rem; margin-left: 1rem; flex-shrink: 0; }
+    .slow-badge { font-size: 0.75rem; font-weight: 700; background: rgba(217,119,6,0.12); color: #d97706; padding: 0.15rem 0.45rem; border-radius: 4px; white-space: nowrap; }
+    .trace-duration-badge { display: flex; align-items: center; gap: 0.3rem; font-family: 'Consolas', monospace; font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
+    .trace-status-badge { font-size: 0.78rem; font-weight: 600; padding: 0.15rem 0.45rem; border-radius: 4px; }
+    .trace-status-badge.success { background: var(--badge-success-bg); color: var(--badge-success-text); }
+    .trace-status-badge.error { background: var(--badge-error-bg); color: var(--badge-error-text); }
+    .copy-btn { background: none; border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 4px; display: flex; align-items: center; transition: all 0.15s; }
+    .copy-btn:hover { background: var(--panel-bg-hover); color: var(--accent); border-color: var(--accent); }
+    .chevron-icon { width: 20px; height: 20px; fill: var(--text-muted); transition: transform 0.2s; }
+    .trace-card[open] .chevron-icon { transform: rotate(180deg); }
+
+    .trace-details-content { padding: 1.25rem; border-top: 1px solid var(--border-color); background: var(--bg-color); display: flex; flex-direction: column; gap: 1.25rem; }
+    .trace-id-row { display: flex; align-items: center; gap: 0.75rem; font-size: 0.82rem; }
+    .detail-label { font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.72rem; }
+    .trace-id-val { color: var(--text-muted); word-break: break-all; }
+
+    .waterfall-container { }
+    .waterfall-container h4 { margin: 0 0 0.75rem 0; font-size: 0.9rem; font-weight: 600; color: var(--text-main); }
+    .waterfall-tree { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    /* Correlated logs */
+    .correlated-logs { }
+    .correlated-logs h4 { margin: 0 0 0.6rem 0; font-size: 0.9rem; font-weight: 600; color: var(--text-main); }
+    .no-corr-logs { margin: 0; font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
+    .corr-log-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; }
+    .corr-log-table th { background: var(--panel-bg-hover); color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.4rem 0.75rem; text-align: left; font-weight: 600; border-bottom: 1px solid var(--border-color); }
+    .corr-log-table td { padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+    .corr-log-table tbody tr:last-child td { border-bottom: none; }
+    .corr-msg { word-break: break-word; font-family: 'Consolas', monospace; }
+    .font-mono { font-family: 'Consolas', 'Courier New', monospace; }
+
+    /* Severity */
+    .sev-badge { font-weight: 700; font-size: 0.7rem; padding: 0.12rem 0.4rem; border-radius: 4px; text-transform: uppercase; display: inline-block; }
+    .sev-badge.info, .sev-badge.information { background: var(--badge-info-bg); color: var(--badge-info-text); }
+    .sev-badge.warning, .sev-badge.warn { background: rgba(234,179,8,0.15); color: #ca8a04; }
+    .sev-badge.error, .sev-badge.fatal { background: var(--badge-error-bg); color: var(--badge-error-text); }
+    .sev-badge.debug, .sev-badge.trace { background: var(--border-color); color: var(--text-muted); }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 4rem 2rem; background: var(--panel-bg); border: 1px dashed var(--border-color); border-radius: 8px; color: var(--text-muted); }
+    .empty-icon { width: 48px; height: 48px; fill: var(--text-muted); margin-bottom: 1rem; }
+    .empty-state h3 { margin: 0 0 0.5rem 0; color: var(--text-main); font-size: 1.2rem; }
+    .empty-state p { margin: 0; font-size: 0.9rem; }
+
+    /* Span / Flamegraph nodes */
+    .span-node { position: relative; }
+    .span-details-card { background: var(--item-bg); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; transition: border-color 0.15s; }
+    .span-details-card:hover { border-color: var(--border-hover); }
+    .span-summary { display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.75rem; cursor: pointer; user-select: none; list-style: none; }
+    .span-summary::-webkit-details-marker { display: none; }
+    .span-summary-left { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; font-size: 0.82rem; min-width: 0; flex: 1; }
+    .span-name { color: var(--text-main); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .span-service-badge { font-size: 0.72rem; background: var(--panel-bg-hover); padding: 0.1rem 0.35rem; border-radius: 4px; color: var(--text-muted); white-space: nowrap; }
+    .span-summary-right { display: flex; align-items: center; gap: 1rem; width: 45%; margin-left: 1rem; }
+    .span-duration { font-size: 0.78rem; color: var(--text-muted); min-width: 65px; text-align: right; font-family: 'Consolas', monospace; }
+    .span-timeline-outer { flex: 1; height: 10px; background: rgba(0,0,0,0.05); border-radius: 5px; position: relative; overflow: hidden; }
+    [data-theme="dark"] .span-timeline-outer { background: rgba(255,255,255,0.05); }
+    .span-timeline-inner { position: absolute; height: 100%; border-radius: 5px; top: 0; }
+    .span-content { padding: 0.75rem; background: var(--panel-bg-hover); border-top: 1px solid var(--border-color); font-size: 0.8rem; }
+    .span-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .span-grid-full { grid-column: span 2; }
+    .method-badge { background: var(--badge-info-bg); color: var(--badge-info-text); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; font-family: 'Consolas', monospace; }
+    .status-badge { font-size: 0.72rem; font-weight: 600; padding: 0.1rem 0.35rem; border-radius: 4px; }
+    .status-badge.success { background: var(--badge-success-bg); color: var(--badge-success-text); }
+    .status-badge.error { background: var(--badge-error-bg); color: var(--badge-error-text); }
 </style>
+
 @code {
-    [SupplyParameterFromQuery(Name = "search")]
-    public string? SearchQuery { get; set; }
-
-    [SupplyParameterFromQuery(Name = "expand")]
-    public string? Expand { get; set; }
-
+    private string searchTerm = string.Empty;
+    private string? selectedService = null;
+    private string selectedStatus = "All";
+    private int slowThreshold = 0;
+    private int currentPage = 1;
+    private string? expandedTraceId = null;
+    private const int PageSize = 25;
     private List<ParsedTrace> cachedTraces = new();
+
+    private int TotalPages => (int)Math.Ceiling(FilteredTraces().Count() / (double)PageSize);
 
     private RenderFragment RenderFlamegraphNode(ParsedSpan span, double traceDurationMs, DateTimeOffset traceStartTime, int depth) => __builder =>
     {
@@ -553,30 +379,15 @@
         var durationMs = span.Duration.TotalMilliseconds;
         var leftPct = (offsetMs / traceDurationMs) * 100;
         var widthPct = Math.Max((durationMs / traceDurationMs) * 100, 0.5);
-
-        // Limit maximum left and width to avoid breaking layouts
         if (leftPct < 0) leftPct = 0;
         if (leftPct > 100) leftPct = 100;
         if (leftPct + widthPct > 100) widthPct = 100 - leftPct;
 
-        // Custom color based on type
-        var barColor = "var(--accent)";
-        if (span.IsError)
-        {
-            barColor = "var(--badge-error-text)";
-        }
-        else if (span.Name.Contains("GET"))
-        {
-            barColor = "#0284c7";
-        }
-        else if (span.Name.Contains("POST"))
-        {
-            barColor = "#16a34a";
-        }
-        else if (span.Name.Contains("SELECT") || span.Name.Contains("db"))
-        {
-            barColor = "#7c3aed";
-        }
+        var barColor = span.IsError ? "var(--badge-error-text)" :
+                       span.Name.Contains("GET") ? "#0284c7" :
+                       span.Name.Contains("POST") ? "#16a34a" :
+                       (span.Name.Contains("SELECT") || span.Name.ToLower().Contains("db")) ? "#7c3aed" :
+                       "var(--accent)";
 
         <div class="span-node" style="margin-left: @((depth * 16).ToString())px;">
             <details class="span-details-card">
@@ -595,20 +406,20 @@
                 <div class="span-content">
                     <div class="span-info-grid">
                         <div><strong>Span ID:</strong> <span class="font-mono">@span.SpanId</span></div>
-                        <div><strong>Parent Span ID:</strong> <span class="font-mono">@(string.IsNullOrEmpty(span.ParentSpanId) ? "None (Root)" : span.ParentSpanId)</span></div>
+                        <div><strong>Parent Span:</strong> <span class="font-mono">@(string.IsNullOrEmpty(span.ParentSpanId) ? "None (Root)" : span.ParentSpanId)</span></div>
                         @if (span.HttpStatusCode.HasValue)
                         {
                             <div><strong>HTTP Status:</strong> <span class="status-badge @(span.IsError ? "error" : "success")">@span.HttpStatusCode</span></div>
                         }
                         @if (!string.IsNullOrEmpty(span.HttpMethod))
                         {
-                            <div><strong>HTTP Method:</strong> <span class="method-badge">@span.HttpMethod</span></div>
+                            <div><strong>Method:</strong> <span class="method-badge">@span.HttpMethod</span></div>
                         }
                         @if (!string.IsNullOrEmpty(span.UrlPath))
                         {
-                            <div class="span-grid-full"><strong>URL Path:</strong> <span class="font-mono">@span.UrlPath</span></div>
+                            <div class="span-grid-full"><strong>URL:</strong> <span class="font-mono">@span.UrlPath</span></div>
                         }
-                        <div><strong>Start Time:</strong> @span.StartTime.ToString("HH:mm:ss.fff")</div>
+                        <div><strong>Start:</strong> @span.StartTime.ToString("HH:mm:ss.fff")</div>
                         <div><strong>Duration:</strong> @(Math.Round(durationMs, 3).ToString()) ms</div>
                     </div>
                 </div>
@@ -627,47 +438,111 @@
         UpdateCache();
     }
 
-    protected override void OnParametersSet()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        UpdateCache();
+        if (!firstRender) return;
+        try
+        {
+            var svc = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_traces_service");
+            var sts = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_traces_status");
+            var slw = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_traces_slow");
+
+            if (!string.IsNullOrEmpty(svc)) selectedService = svc;
+            if (!string.IsNullOrEmpty(sts)) selectedStatus = sts;
+            if (!string.IsNullOrEmpty(slw) && int.TryParse(slw, out var s)) slowThreshold = s;
+
+            StateHasChanged();
+        }
+        catch { }
     }
 
     private void OnTelemetryReceived()
     {
-        if (Config.GetValue<bool>("Dashboard:UseWebSockets", false))
+        if (true)
         {
-            InvokeAsync(() => 
-            {
-                UpdateCache();
-                StateHasChanged();
-            });
+            InvokeAsync(() => { UpdateCache(); StateHasChanged(); });
         }
     }
-    
+
     private void UpdateCache()
     {
-        cachedTraces = Store.Traces.Values
-            .OrderByDescending(t => t.StartTime)
-            .Take(100)
-            .ToList();
+        cachedTraces = Store.Traces.Values.OrderByDescending(t => t.StartTime).Take(500).ToList();
     }
 
-    private bool SearchQueryAndExpandMatch(string? traceId)
+    private IEnumerable<ParsedTrace> FilteredTraces()
     {
-        return Expand == traceId;
+        var traces = cachedTraces.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(selectedService))
+            traces = traces.Where(t => t.AllSpans.Any(s => s.ServiceName == selectedService));
+
+        if (selectedStatus == "Success") traces = traces.Where(t => !t.HasError);
+        if (selectedStatus == "Error")   traces = traces.Where(t => t.HasError);
+
+        if (slowThreshold > 0)
+            traces = traces.Where(t => t.TotalDuration.TotalMilliseconds >= slowThreshold);
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var q = searchTerm.ToLowerInvariant();
+            traces = traces.Where(t =>
+                (t.TraceId?.ToLowerInvariant().Contains(q) == true) ||
+                t.AllSpans.Any(s =>
+                    (s.Name?.ToLowerInvariant().Contains(q) == true) ||
+                    (s.ServiceName?.ToLowerInvariant().Contains(q) == true) ||
+                    (s.UrlPath?.ToLowerInvariant().Contains(q) == true))
+            );
+        }
+
+        return traces;
     }
 
-    private IEnumerable<ParsedTrace> GetFilteredTraces()
+    private IEnumerable<ParsedTrace> PagedTraces() =>
+        FilteredTraces().Skip((currentPage - 1) * PageSize).Take(PageSize);
+
+    private static string GetSevClass(string? sev) => (sev ?? "").ToLowerInvariant() switch
     {
-        if (string.IsNullOrWhiteSpace(SearchQuery)) return cachedTraces;
-        
-        var lowerSearch = SearchQuery.ToLowerInvariant();
-        return cachedTraces.Where(t => 
-            t.TraceId?.ToLowerInvariant().Contains(lowerSearch) == true || 
-            (t.RootSpan?.Name?.ToLowerInvariant().Contains(lowerSearch) == true) ||
-            (t.RootSpan?.ServiceName?.ToLowerInvariant().Contains(lowerSearch) == true)
-        );
+        "warning" or "warn" => "warning",
+        "error" => "error",
+        "fatal" or "critical" => "fatal",
+        "debug" => "debug",
+        "trace" => "trace",
+        _ => "info"
+    };
+
+    private async Task SetService(string? svc)
+    {
+        selectedService = svc; currentPage = 1;
+        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_traces_service", svc ?? "");
     }
+
+    private async Task SetStatus(string sts)
+    {
+        selectedStatus = sts; currentPage = 1;
+        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_traces_status", sts);
+    }
+
+    private async Task SetSlow(int ms)
+    {
+        slowThreshold = ms; currentPage = 1;
+        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_traces_slow", ms.ToString());
+    }
+
+    private async Task CopyTraceId(string traceId)
+    {
+        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", traceId); }
+        catch { }
+    }
+
+    private void ClearTraces()
+    {
+        Store.ClearTraces();
+        UpdateCache();
+    }
+
+    private void PrevPage() { if (currentPage > 1) currentPage--; }
+    private void NextPage() { if (currentPage < TotalPages) currentPage++; }
+    private void ResetPage() => currentPage = 1;
 
     public void Dispose()
     {

@@ -12,10 +12,15 @@ public interface ITelemetryStore
     ConcurrentQueue<ExportMetricsServiceRequest> Metrics { get; }
 
     void AddTrace(ExportTraceServiceRequest request);
-
     void AddLog(ExportLogsServiceRequest request);
-
     void AddMetric(ExportMetricsServiceRequest metric);
+
+    void ClearLogs();
+    void ClearTraces();
+    void ClearMetrics();
+
+    /// <summary>Returns distinct service names seen across all telemetry types.</summary>
+    IReadOnlyList<string> GetServiceNames();
 
     event Action? OnTelemetryReceived;
 }

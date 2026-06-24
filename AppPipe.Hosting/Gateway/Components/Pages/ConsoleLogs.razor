@@ -1,67 +1,168 @@
 @page "/logs"
 @using AppPipe.Hosting
+@using Microsoft.Extensions.Configuration
+@using Microsoft.JSInterop
 @inject ITelemetryStore Store
+@inject IConfiguration Config
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Console Logs - AppPipe.NET</PageTitle>
 
 <div class="page-container">
+    <!-- Header -->
     <div class="page-header">
-        <h1>Console Logs</h1>
+        <div class="header-left">
+            <h1>Console Logs</h1>
+            <span class="retention-badge">@Store.Logs.Count <span class="ret-sep">/</span> 500</span>
+        </div>
         <div class="header-actions">
-            <input type="text" @bind="searchTerm" @bind:event="oninput" placeholder="Filter logs..." class="aspire-input" />
-            <button class="aspire-btn" @onclick="() => isPaused = !isPaused">
+            <button class="aspire-btn" @onclick="TogglePause">
                 @(isPaused ? "▶ Resume" : "⏸ Pause")
             </button>
+            <button class="aspire-btn" @onclick="ExportCsv">⬇ Export CSV</button>
+            <button class="aspire-btn danger-btn" @onclick="ClearLogs">🗑 Clear</button>
         </div>
     </div>
 
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <!-- Search -->
+        <div class="search-wrapper">
+            <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input id="log-search" type="text" @bind="searchTerm" @bind:event="oninput" @bind:after="OnSearchChanged"
+                   placeholder="Search logs... (press / to focus)" class="aspire-input search-input" />
+            @if (!string.IsNullOrEmpty(searchTerm))
+            {
+                <button class="clear-search-btn" @onclick="() => { searchTerm = string.Empty; currentPage = 1; }">✕</button>
+            }
+        </div>
+
+        <!-- Service Pills -->
+        <div class="filter-group">
+            <span class="filter-label">Service</span>
+            <div class="pill-row">
+                <button class="pill @(selectedService == null ? "active" : "")" @onclick="() => SetService(null)">All</button>
+                @foreach (var svc in Store.GetServiceNames())
+                {
+                    var s = svc;
+                    <button class="pill @(selectedService == s ? "active" : "")" @onclick="() => SetService(s)">@s</button>
+                }
+            </div>
+        </div>
+
+        <!-- Severity Pills -->
+        <div class="filter-group">
+            <span class="filter-label">Level</span>
+            <div class="pill-row">
+                @foreach (var lvl in new[] { "All", "Debug", "Info", "Warning", "Error" })
+                {
+                    var l = lvl;
+                    <button class="pill sev-pill @(selectedLevel == l ? "active" : "") @(l != "All" ? l.ToLower() : "")"
+                            @onclick="() => SetLevel(l)">@l</button>
+                }
+            </div>
+        </div>
+
+        <!-- Time Range Pills -->
+        <div class="filter-group">
+            <span class="filter-label">Time</span>
+            <div class="pill-row">
+                @foreach (var (label, mins) in timeRanges)
+                {
+                    var m = mins;
+                    var lbl = label;
+                    <button class="pill @(selectedTimeRange == m ? "active" : "")" @onclick="() => SetTimeRange(m)">@lbl</button>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Result count + pagination info -->
+    <div class="results-bar">
+        <span class="result-count">
+            Showing <strong>@PagedLogs().Count()</strong> of <strong>@FilteredLogs().Count()</strong> logs
+        </span>
+        @if (TotalPages > 1)
+        {
+            <div class="pagination">
+                <button class="aspire-btn page-btn" disabled="@(currentPage <= 1)" @onclick="PrevPage">← Prev</button>
+                <span class="page-info">Page @currentPage of @TotalPages</span>
+                <button class="aspire-btn page-btn" disabled="@(currentPage >= TotalPages)" @onclick="NextPage">Next →</button>
+            </div>
+        }
+    </div>
+
+    <!-- Table -->
     <div class="aspire-table-container console-container">
         <table class="aspire-table console-table">
             <thead>
                 <tr>
-                    <th style="width: 150px">Timestamp</th>
-                    <th style="width: 100px">Level</th>
-                    <th style="width: 200px">Service</th>
+                    <th style="width: 160px">Timestamp</th>
+                    <th style="width: 90px">Level</th>
+                    <th style="width: 180px">Service</th>
                     <th>Message</th>
                 </tr>
             </thead>
             <tbody>
-                @if (!GetFilteredLogs().Any())
+                @{
+                    var rows = PagedLogs().ToList();
+                }
+                @if (!rows.Any())
                 {
                     <tr>
-                        <td colspan="4" class="empty-cell">Waiting for logs...</td>
+                        <td colspan="4" class="empty-cell">
+                            @if (Store.Logs.IsEmpty)
+                            {
+                                <span>Waiting for logs...</span>
+                            }
+                            else
+                            {
+                                <span>No logs match the current filters.</span>
+                            }
+                        </td>
                     </tr>
                 }
                 else
                 {
-                    @foreach (var log in GetFilteredLogs())
+                    @foreach (var log in rows)
                     {
-                        var severityClass = log.Severity?.ToLowerInvariant() ?? "info";
-
-                        <tr>
-                            <td class="font-mono">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
-                            <td><span class="sev-badge @severityClass">@log.Severity</span></td>
+                        var sevClass = GetSevClass(log.Severity);
+                        <tr class="log-row @sevClass">
+                            <td class="font-mono ts-col">@log.Timestamp.ToString("HH:mm:ss.fff")</td>
+                            <td><span class="sev-badge @sevClass">@(log.Severity ?? "?")</span></td>
                             <td class="service-col">@log.ServiceName</td>
                             <td class="msg-col">
-                                @if (log.Attributes != null && log.Attributes.Any())
+                                @if ((log.Attributes != null && log.Attributes.Any()) || !string.IsNullOrEmpty(log.TraceId))
                                 {
-                                    <details class="log-details-accordion">
-                                        <summary class="log-summary-msg">@log.Message</summary>
-                                        <div class="waterfall-container">
-                                            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1.5rem; font-family: monospace; font-size: 0.8rem; margin-top: 0.5rem;">
+                                    <details class="log-accordion">
+                                        <summary class="log-summary">
+                                            <span class="msg-text">@log.Message</span>
+                                            @if (!string.IsNullOrEmpty(log.TraceId))
+                                            {
+                                                <a href="/traces?search=@log.TraceId" class="trace-link" title="View trace @log.TraceId" @onclick:stopPropagation="true">
+                                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                                                    trace
+                                                </a>
+                                            }
+                                        </summary>
+                                        @if (log.Attributes != null && log.Attributes.Any())
+                                        {
+                                            <div class="attr-grid">
                                                 @foreach (var attr in log.Attributes)
                                                 {
-                                                    <div style="color: var(--text-muted); font-weight: 500;">@attr.Key</div>
-                                                    <div style="word-break: break-all;">@attr.Value</div>
+                                                    var key = attr.Key;
+                                                    var val = attr.Value;
+                                                    <span class="attr-key">@key</span>
+                                                    <span class="attr-val" @onclick="() => FilterByAttr(val)" title="Click to filter by this value">@val</span>
                                                 }
                                             </div>
-                                        </div>
+                                        }
                                     </details>
                                 }
                                 else
                                 {
-                                    @log.Message
+                                    <span class="msg-text">@log.Message</span>
                                 }
                             </td>
                         </tr>
@@ -70,140 +171,132 @@
             </tbody>
         </table>
     </div>
+
+    @if (TotalPages > 1)
+    {
+        <div class="pagination bottom-pagination">
+            <button class="aspire-btn page-btn" disabled="@(currentPage <= 1)" @onclick="PrevPage">← Prev</button>
+            <span class="page-info">Page @currentPage of @TotalPages</span>
+            <button class="aspire-btn page-btn" disabled="@(currentPage >= TotalPages)" @onclick="NextPage">Next →</button>
+        </div>
+    }
 </div>
 
+<!-- Keyboard shortcut: / focuses search -->
+<script>
+    (function () {
+        document.addEventListener('keydown', function (e) {
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                var el = document.getElementById('log-search');
+                if (el) el.focus();
+            }
+        });
+    })();
+</script>
+
 <style>
-    .page-container {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.5rem;
-    }
-    
-    .page-header h1 {
-        font-size: 1.5rem;
-        font-weight: 600;
-        margin: 0;
-    }
-    
-    .header-actions {
-        display: flex;
-        gap: 1rem;
-    }
-    
-    .aspire-input {
-        background: var(--item-bg);
-        border: 1px solid var(--border-color);
-        color: var(--text-main);
-        padding: 0.4rem 0.75rem;
-        border-radius: 4px;
-        font-family: inherit;
-        font-size: 0.9rem;
-        width: 250px;
-    }
-    
-    .aspire-input:focus {
-        outline: none;
-        border-color: var(--accent);
-    }
-    
-    .aspire-btn {
-        background: var(--item-bg);
-        border: 1px solid var(--border-color);
-        color: var(--text-main);
-        padding: 0.4rem 1rem;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 500;
-    }
-    
-    .aspire-btn:hover {
-        background: var(--panel-bg-hover);
-    }
+    .page-container { display: flex; flex-direction: column; height: 100%; gap: 1rem; }
 
-    .empty-cell {
-        text-align: center;
-        color: var(--text-muted);
-        padding: 3rem !important;
-    }
+    .page-header { display: flex; justify-content: space-between; align-items: center; }
+    .header-left { display: flex; align-items: center; gap: 0.75rem; }
+    .page-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; }
+    .retention-badge { font-size: 0.8rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 20px; background: var(--panel-bg-hover); color: var(--text-muted); font-family: 'Consolas', monospace; }
+    .ret-sep { opacity: 0.4; margin: 0 0.1rem; }
+    .header-actions { display: flex; gap: 0.6rem; align-items: center; }
 
-    .font-mono { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.85rem; }
-    
-    .console-table th {
-        position: sticky;
-        top: 0;
-        z-index: 2;
-    }
+    .aspire-btn { background: var(--item-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem 0.85rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; font-family: inherit; transition: background 0.15s, border-color 0.15s; display: inline-flex; align-items: center; gap: 0.35rem; }
+    .aspire-btn:hover { background: var(--panel-bg-hover); border-color: var(--border-hover); }
+    .aspire-btn:disabled { opacity: 0.4; cursor: default; }
+    .danger-btn { border-color: var(--badge-error-text); color: var(--badge-error-text); }
+    .danger-btn:hover { background: var(--badge-error-bg); }
 
-    .console-table td {
-        vertical-align: top;
-        font-family: 'Consolas', 'Courier New', monospace;
-        font-size: 0.85rem;
-    }
+    /* Filter bar */
+    .filter-bar { display: flex; flex-direction: column; gap: 0.6rem; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.85rem 1rem; }
+    .search-wrapper { position: relative; display: flex; align-items: center; }
+    .search-icon { position: absolute; left: 10px; width: 16px; height: 16px; fill: var(--text-muted); pointer-events: none; }
+    .aspire-input { background: var(--item-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem 0.75rem 0.4rem 2.1rem; border-radius: 6px; font-family: inherit; font-size: 0.875rem; transition: border-color 0.15s, box-shadow 0.15s; }
+    .search-input { width: 300px; }
+    .aspire-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(2,132,199,0.12); }
+    .clear-search-btn { position: absolute; right: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; padding: 0.2rem; line-height: 1; }
+    .clear-search-btn:hover { color: var(--text-main); }
 
-    .service-col {
-        color: var(--accent);
-    }
+    .filter-group { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    .filter-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); min-width: 50px; }
+    .pill-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .pill { background: var(--item-bg); border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.2rem 0.65rem; border-radius: 20px; cursor: pointer; font-size: 0.8rem; font-weight: 500; font-family: inherit; transition: all 0.15s; white-space: nowrap; }
+    .pill:hover { background: var(--panel-bg-hover); color: var(--text-main); }
+    .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sev-pill.debug { border-color: var(--border-color); }
+    .sev-pill.info.active { background: var(--badge-info-bg); border-color: var(--badge-info-text); color: var(--badge-info-text); }
+    .sev-pill.warning.active { background: rgba(234,179,8,0.15); border-color: #ca8a04; color: #ca8a04; }
+    .sev-pill.error.active { background: var(--badge-error-bg); border-color: var(--badge-error-text); color: var(--badge-error-text); }
 
-    .msg-col {
-        word-break: break-all;
-    }
+    /* Results bar */
+    .results-bar { display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
+    .result-count { font-size: 0.85rem; color: var(--text-muted); }
+    .result-count strong { color: var(--text-main); }
 
-    .sev-badge {
-        font-weight: 600;
-        font-size: 0.75rem;
-        padding: 0.1rem 0.4rem;
-        border-radius: 3px;
-        text-transform: uppercase;
-    }
-    
+    /* Pagination */
+    .pagination { display: flex; align-items: center; gap: 0.5rem; }
+    .page-btn { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
+    .page-info { font-size: 0.82rem; color: var(--text-muted); }
+    .bottom-pagination { justify-content: center; margin-top: 0.5rem; }
+
+    /* Table */
+    .console-container { flex: 1; overflow: auto; }
+    .console-table th { position: sticky; top: 0; z-index: 2; }
+    .console-table td { vertical-align: top; font-size: 0.85rem; }
+    .ts-col { font-family: 'Consolas', 'Courier New', monospace; color: var(--text-muted); white-space: nowrap; }
+    .service-col { color: var(--accent); font-size: 0.85rem; }
+    .msg-col { word-break: break-word; }
+    .font-mono { font-family: 'Consolas', 'Courier New', monospace; }
+
+    /* Row severity tints */
+    .log-row.error td, .log-row.fatal td { background-color: rgba(239,68,68,0.03) !important; }
+    .log-row.warning td, .log-row.warn td { background-color: rgba(234,179,8,0.03) !important; }
+
+    /* Severity badges */
+    .sev-badge { font-weight: 700; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; text-transform: uppercase; white-space: nowrap; display: inline-block; }
     .sev-badge.info, .sev-badge.information { background: var(--badge-info-bg); color: var(--badge-info-text); }
-    .sev-badge.warn, .sev-badge.warning { background: rgba(234, 179, 8, 0.15); color: #ca8a04; }
+    .sev-badge.warning, .sev-badge.warn { background: rgba(234,179,8,0.15); color: #ca8a04; }
+    [data-theme="dark"] .sev-badge.warning, [data-theme="dark"] .sev-badge.warn { color: #facc15; }
     .sev-badge.error, .sev-badge.fatal { background: var(--badge-error-bg); color: var(--badge-error-text); }
     .sev-badge.debug, .sev-badge.trace { background: var(--border-color); color: var(--text-muted); }
-    
-    [data-theme="dark"] .sev-badge.warn, [data-theme="dark"] .sev-badge.warning { color: #facc15; }
 
-    .log-details-accordion {
-        width: 100%;
-    }
-    
-    .log-summary-msg {
-        cursor: pointer;
-        user-select: none;
-        outline: none;
-        font-weight: 500;
-    }
-    
-    .log-summary-msg:hover {
-        color: var(--accent);
-    }
+    /* Log accordion */
+    .log-accordion { width: 100%; }
+    .log-summary { cursor: pointer; user-select: none; outline: none; display: flex; align-items: baseline; gap: 0.5rem; list-style: none; }
+    .log-summary::-webkit-details-marker { display: none; }
+    .msg-text { word-break: break-word; }
+    .trace-link { font-size: 0.75rem; color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 0.2rem; opacity: 0.8; flex-shrink: 0; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.05rem 0.35rem; }
+    .trace-link:hover { opacity: 1; background: var(--panel-bg-hover); }
 
-    .waterfall-container {
-        padding: 0.75rem 1rem;
-        border: 1px solid var(--border-color);
-        background: rgba(0, 0, 0, 0.02);
-        border-radius: 4px;
-        margin-top: 0.5rem;
-    }
-    
-    [data-theme="dark"] .waterfall-container {
-        background: rgba(255, 255, 255, 0.02);
-    }
+    /* Attribute grid */
+    .attr-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 1rem; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.78rem; margin-top: 0.5rem; padding: 0.6rem 0.75rem; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; }
+    .attr-key { color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+    .attr-val { color: var(--text-main); word-break: break-all; cursor: pointer; transition: color 0.15s; }
+    .attr-val:hover { color: var(--accent); text-decoration: underline; }
+
+    .empty-cell { text-align: center; color: var(--text-muted); padding: 3rem !important; font-size: 0.95rem; }
 </style>
 
 @code {
     private bool isPaused = false;
-    private string searchTerm = "";
+    private string searchTerm = string.Empty;
+    private string? selectedService = null;
+    private string selectedLevel = "All";
+    private int selectedTimeRange = 0; // 0 = All
+    private int currentPage = 1;
+    private const int PageSize = 50;
     private List<ParsedLog> cachedLogs = new();
-    // Toggle state is now handled natively by HTML <details> tag
+
+    private readonly (string Label, int Mins)[] timeRanges = new[]
+    {
+        ("5m", 5), ("15m", 15), ("1h", 60), ("6h", 360), ("All", 0)
+    };
+
+    private int TotalPages => (int)Math.Ceiling(FilteredLogs().Count() / (double)PageSize);
 
     protected override void OnInitialized()
     {
@@ -211,35 +304,146 @@
         UpdateCache();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var svc = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_logs_service");
+            var lvl = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_logs_level");
+            var rng = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_logs_timerange");
+
+            if (!string.IsNullOrEmpty(svc)) selectedService = svc;
+            if (!string.IsNullOrEmpty(lvl)) selectedLevel = lvl;
+            if (!string.IsNullOrEmpty(rng) && int.TryParse(rng, out var r)) selectedTimeRange = r;
+
+            StateHasChanged();
+        }
+        catch { /* localStorage not available */ }
+    }
+
     private void OnTelemetryReceived()
     {
         if (!isPaused)
         {
-            InvokeAsync(() => 
-            {
-                UpdateCache();
-                StateHasChanged();
-            });
+            InvokeAsync(() => { UpdateCache(); StateHasChanged(); });
         }
     }
-    
+
     private void UpdateCache()
     {
-        cachedLogs = Store.Logs
-            .OrderByDescending(l => l.Timestamp)
-            .Take(200)
-            .ToList();
+        cachedLogs = Store.Logs.OrderByDescending(l => l.Timestamp).Take(500).ToList();
     }
-    
-    private IEnumerable<ParsedLog> GetFilteredLogs()
+
+    private IEnumerable<ParsedLog> FilteredLogs()
     {
-        if (string.IsNullOrWhiteSpace(searchTerm)) return cachedLogs;
-        
-        var lowerSearch = searchTerm.ToLowerInvariant();
-        return cachedLogs.Where(l => 
-            l.Message?.ToLowerInvariant().Contains(lowerSearch) == true || 
-            l.ServiceName?.ToLowerInvariant().Contains(lowerSearch) == true
-        );
+        var logs = cachedLogs.AsEnumerable();
+
+        // Time range
+        if (selectedTimeRange > 0)
+        {
+            var cutoff = DateTimeOffset.UtcNow.AddMinutes(-selectedTimeRange);
+            logs = logs.Where(l => l.Timestamp >= cutoff);
+        }
+
+        // Service
+        if (!string.IsNullOrEmpty(selectedService))
+            logs = logs.Where(l => l.ServiceName == selectedService);
+
+        // Level
+        if (selectedLevel != "All")
+        {
+            var lvl = selectedLevel.ToLowerInvariant();
+            logs = logs.Where(l => (l.Severity ?? "").ToLowerInvariant().StartsWith(lvl));
+        }
+
+        // Text search
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var q = searchTerm.ToLowerInvariant();
+            logs = logs.Where(l =>
+                (l.Message?.ToLowerInvariant().Contains(q) == true) ||
+                (l.ServiceName?.ToLowerInvariant().Contains(q) == true) ||
+                (l.TraceId?.ToLowerInvariant().Contains(q) == true) ||
+                (l.Attributes != null && l.Attributes.Any(a =>
+                    a.Key.ToLowerInvariant().Contains(q) ||
+                    a.Value.ToLowerInvariant().Contains(q)))
+            );
+        }
+
+        return logs;
+    }
+
+    private IEnumerable<ParsedLog> PagedLogs()
+    {
+        return FilteredLogs().Skip((currentPage - 1) * PageSize).Take(PageSize);
+    }
+
+    private static string GetSevClass(string? sev)
+    {
+        return (sev ?? "").ToLowerInvariant() switch
+        {
+            "warning" or "warn" => "warning",
+            "error" => "error",
+            "fatal" or "critical" => "fatal",
+            "debug" => "debug",
+            "trace" => "trace",
+            _ => "info"
+        };
+    }
+
+    private void OnSearchChanged() => currentPage = 1;
+
+    private async Task SetService(string? svc)
+    {
+        selectedService = svc;
+        currentPage = 1;
+        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_logs_service", svc ?? "");
+    }
+
+    private async Task SetLevel(string lvl)
+    {
+        selectedLevel = lvl;
+        currentPage = 1;
+        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_logs_level", lvl);
+    }
+
+    private async Task SetTimeRange(int mins)
+    {
+        selectedTimeRange = mins;
+        currentPage = 1;
+        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_logs_timerange", mins.ToString());
+    }
+
+    private void FilterByAttr(string val)
+    {
+        searchTerm = val;
+        currentPage = 1;
+    }
+
+    private void TogglePause() => isPaused = !isPaused;
+
+    private void PrevPage() { if (currentPage > 1) currentPage--; }
+    private void NextPage() { if (currentPage < TotalPages) currentPage++; }
+
+    private void ClearLogs()
+    {
+        Store.ClearLogs();
+        UpdateCache();
+    }
+
+    private async Task ExportCsv()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Timestamp,Level,Service,Message");
+        foreach (var log in FilteredLogs())
+        {
+            var msg = (log.Message ?? "").Replace("\"", "\"\"");
+            sb.AppendLine($"\"{log.Timestamp:yyyy-MM-dd HH:mm:ss.fff}\",\"{log.Severity}\",\"{log.ServiceName}\",\"{msg}\"");
+        }
+        var csv = sb.ToString();
+        var b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(csv));
+        await JS.InvokeVoidAsync("eval", $"var a=document.createElement('a');a.href='data:text/csv;base64,{b64}';a.download='logs.csv';a.click()");
     }
 
     public void Dispose()

@@ -7,7 +7,7 @@ namespace AppPipe.Hosting;
 
 public class InMemoryTelemetryStore : ITelemetryStore
 {
-    private const int MaxItems = 200;
+    private const int MaxItems = 500;
 
     public ConcurrentDictionary<string, ParsedTrace> Traces { get; } = new();
     protected ConcurrentQueue<string> TraceIds { get; } = new();
@@ -15,14 +15,17 @@ public class InMemoryTelemetryStore : ITelemetryStore
     public ConcurrentQueue<ParsedLog> Logs { get; } = new();
     public ConcurrentQueue<ExportMetricsServiceRequest> Metrics { get; } = new();
 
+    // Tracks last-seen timestamp per service for health indicators
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastSeenByService = new();
+
     public virtual void AddTrace(ExportTraceServiceRequest request)
     {
-        bool newTraceAdded = false;
-
         foreach (var resourceSpan in request.ResourceSpans)
         {
             var serviceName = resourceSpan.Resource.Attributes
                 .FirstOrDefault(a => a.Key == "service.name")?.Value.StringValue ?? "Unknown Service";
+
+            _lastSeenByService[serviceName] = DateTimeOffset.UtcNow;
 
             foreach (var scopeSpan in resourceSpan.ScopeSpans)
             {
@@ -61,9 +64,7 @@ public class InMemoryTelemetryStore : ITelemetryStore
                     Traces.AddOrUpdate(traceId,
                         (id) =>
                         {
-                            newTraceAdded = true;
                             TraceIds.Enqueue(id);
-
                             var trace = new ParsedTrace(id, startTime, TimeSpan.Zero, null, new List<ParsedSpan> { parsedSpan }, isError);
                             return RecomputeTrace(trace);
                         },
@@ -121,6 +122,8 @@ public class InMemoryTelemetryStore : ITelemetryStore
             var serviceName = resourceLog.Resource.Attributes
                 .FirstOrDefault(a => a.Key == "service.name")?.Value.StringValue ?? "Unknown Service";
 
+            _lastSeenByService[serviceName] = DateTimeOffset.UtcNow;
+
             foreach (var scopeLog in resourceLog.ScopeLogs)
             {
                 foreach (var logRecord in scopeLog.LogRecords)
@@ -163,10 +166,60 @@ public class InMemoryTelemetryStore : ITelemetryStore
 
     public virtual void AddMetric(ExportMetricsServiceRequest metric)
     {
+        // Track service names from metrics resource attributes
+        foreach (var rm in metric.ResourceMetrics)
+        {
+            var svc = rm.Resource?.Attributes.FirstOrDefault(a => a.Key == "service.name")?.Value.StringValue;
+            if (!string.IsNullOrEmpty(svc))
+                _lastSeenByService[svc] = DateTimeOffset.UtcNow;
+        }
+
         Metrics.Enqueue(metric);
         if (Metrics.Count > MaxItems) Metrics.TryDequeue(out _);
         OnTelemetryReceived?.Invoke();
     }
+
+    public virtual void ClearLogs()
+    {
+        while (Logs.TryDequeue(out _)) { }
+        OnTelemetryReceived?.Invoke();
+    }
+
+    public virtual void ClearTraces()
+    {
+        Traces.Clear();
+        while (TraceIds.TryDequeue(out _)) { }
+        OnTelemetryReceived?.Invoke();
+    }
+
+    public virtual void ClearMetrics()
+    {
+        while (Metrics.TryDequeue(out _)) { }
+        OnTelemetryReceived?.Invoke();
+    }
+
+    public IReadOnlyList<string> GetServiceNames()
+    {
+        var names = new HashSet<string>();
+
+        foreach (var log in Logs)
+            names.Add(log.ServiceName);
+
+        foreach (var trace in Traces.Values)
+        {
+            foreach (var span in trace.AllSpans)
+                names.Add(span.ServiceName);
+        }
+
+        foreach (var key in _lastSeenByService.Keys)
+            names.Add(key);
+
+        return names.OrderBy(n => n).ToList();
+    }
+
+    /// <summary>Returns the last telemetry timestamp per service, for health indicators.</summary>
+    public IReadOnlyDictionary<string, DateTimeOffset> GetLastSeenByService()
+        => _lastSeenByService;
 
     public event Action? OnTelemetryReceived;
 }

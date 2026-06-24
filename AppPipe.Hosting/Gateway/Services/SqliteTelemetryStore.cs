@@ -446,6 +446,57 @@ public class SqliteTelemetryStore : InMemoryTelemetryStore
         });
     }
 
+    public override void ClearLogs()
+    {
+        base.ClearLogs();
+        if (!_dbEnabled) return;
+        Task.Run(() =>
+        {
+            try
+            {
+                using var conn = new SqliteConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqliteCommand("DELETE FROM Logs", conn);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { Console.WriteLine($"[SqliteTelemetryStore] ClearLogs error: {ex.Message}"); }
+        });
+    }
+
+    public override void ClearTraces()
+    {
+        base.ClearTraces();
+        if (!_dbEnabled) return;
+        Task.Run(() =>
+        {
+            try
+            {
+                using var conn = new SqliteConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqliteCommand("DELETE FROM Spans", conn);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { Console.WriteLine($"[SqliteTelemetryStore] ClearTraces error: {ex.Message}"); }
+        });
+    }
+
+    public override void ClearMetrics()
+    {
+        base.ClearMetrics();
+        if (!_dbEnabled) return;
+        Task.Run(() =>
+        {
+            try
+            {
+                using var conn = new SqliteConnection(_connectionString);
+                conn.Open();
+                using var cmd = new SqliteCommand("DELETE FROM Metrics", conn);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { Console.WriteLine($"[SqliteTelemetryStore] ClearMetrics error: {ex.Message}"); }
+        });
+    }
+
     private void PruneDatabase(SqliteConnection conn)
     {
         try

@@ -27,8 +27,6 @@
 </html>
 
 @code {
-    private Microsoft.AspNetCore.Components.IComponentRenderMode? CurrentRenderMode =>
-        Config.GetValue<bool>("Dashboard:UseWebSockets", false) 
-        ? Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer 
-        : null;
+    private Microsoft.AspNetCore.Components.IComponentRenderMode CurrentRenderMode =>
+        Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer;
 }
