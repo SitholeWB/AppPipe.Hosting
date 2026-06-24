@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "AppPipeSystem.AppHost": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "dashboard",
+      "applicationUrl": "http://localhost:7001"
+    }
+  }
+}

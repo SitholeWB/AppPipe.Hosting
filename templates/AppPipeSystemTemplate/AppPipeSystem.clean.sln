@@ -3,17 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppPipeSystem.AppHost", "AppPipeSystem.AppHost\AppPipeSystem.AppHost.csproj", "{A0FA17D5-42E2-441F-AF1A-C54FA8EE1D9A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.AppHost", "AppPipeSystem.AppHost\AppPipeSystem.AppHost.csproj", "{A0FA17D5-42E2-441F-AF1A-C54FA8EE1D9A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppPipeSystem.ApiService", "AppPipeSystem.ApiService\AppPipeSystem.ApiService.csproj", "{C4E72591-D36A-4A0B-971B-CE7A16891F4A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.ApiService", "AppPipeSystem.ApiService\AppPipeSystem.ApiService.csproj", "{C4E72591-D36A-4A0B-971B-CE7A16891F4A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppPipeSystem.Web", "AppPipeSystem.Web\AppPipeSystem.Web.csproj", "{B9EF851F-14C2-4B38-B506-69EF851FAF1F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.Web", "AppPipeSystem.Web\AppPipeSystem.Web.csproj", "{B9EF851F-14C2-4B38-B506-69EF851FAF1F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppPipeSystem.Domain", "AppPipeSystem.Domain\AppPipeSystem.Domain.csproj", "{E1DF3E7B-71F2-4CD3-8632-15F08C69EF1F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.Domain", "AppPipeSystem.Domain\AppPipeSystem.Domain.csproj", "{E1DF3E7B-71F2-4CD3-8632-15F08C69EF1F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppPipeSystem.Application", "AppPipeSystem.Application\AppPipeSystem.Application.csproj", "{9FCE3629-B101-4475-AC33-9118D6891F4B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.Application", "AppPipeSystem.Application\AppPipeSystem.Application.csproj", "{9FCE3629-B101-4475-AC33-9118D6891F4B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppPipeSystem.Infrastructure", "AppPipeSystem.Infrastructure\AppPipeSystem.Infrastructure.csproj", "{DB5E602A-84A0-449D-BBDE-20C926891F4C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.Infrastructure", "AppPipeSystem.Infrastructure\AppPipeSystem.Infrastructure.csproj", "{DB5E602A-84A0-449D-BBDE-20C926891F4C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

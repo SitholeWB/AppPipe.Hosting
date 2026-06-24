@@ -5,8 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry;
-using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -129,7 +127,7 @@ public class GatewayAppPipeHost
             .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
         _app = builder.Build();
-
+        var _logger = _app.Services.GetRequiredService<ILogger<GatewayAppPipeHost>>();
         // Gateway Diagnostics Middleware
         _app.Use(async (context, next) =>
         {
@@ -206,8 +204,20 @@ public class GatewayAppPipeHost
             configureApp(_app);
         }
 
-        _app.UseStaticFiles();
-        _app.MapStaticAssets();
+        try
+        {
+            _app.MapStaticAssets();
+        }
+        catch (InvalidOperationException ex) when (string.Equals(ex.Source, "Microsoft.AspNetCore.StaticAssets", StringComparison.OrdinalIgnoreCase))
+        {
+            _app.UseStaticFiles();
+            _logger.LogWarning(ex, "[AppPipe.Hosting] Static web assets not found. Ensure that the project is built and the static web assets are published.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[AppPipe.Hosting] Error while mapping static assets.");
+            throw;
+        }
 
         _app.MapGet("/debug-env", (IWebHostEnvironment env) => new
         {

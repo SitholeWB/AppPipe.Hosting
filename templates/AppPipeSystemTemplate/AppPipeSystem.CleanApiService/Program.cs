@@ -21,7 +21,6 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
-        builder.Services.AddWindowsService();
 
         // 1. Identify your service for the dashboard
         var resourceBuilder = ResourceBuilder.CreateDefault().AddService("ApiService");

@@ -2,7 +2,7 @@
   "$schema": "http://json.schemastore.org/template",
   "author": "Welcome Bonginhlahla Sithole",
   "classifications": [ "Common", "Console", "Web", "Orchestrator", "Gateway", "Solution" ],
-  "name": "AppPipe Gateway System",
+  "name": "AppPipe Application Hosting",
   "identity": "AppPipe.Hosting.System.Template",
   "shortName": "app-pipe",
   "tags": {

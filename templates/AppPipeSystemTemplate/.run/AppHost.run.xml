@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run AppHost" type="DotNetProject" factoryName=".NET Project">
+    <option name="PROJECT_PATH" value="$PROJECT_DIR$/AppPipeSystem.AppHost/AppPipeSystem.AppHost.csproj" />
+    <option name="PROJECT_EXE_PATH_TRACKING" value="1" />
+    <option name="PROJECT_ARGUMENTS_TRACKING" value="1" />
+    <option name="PROJECT_WORKING_DIRECTORY_TRACKING" value="1" />
+    <option name="PROJECT_KIND" value="Console" />
+    <option name="PROJECT_TFM" value="net10.0" />
+    <method v="2">
+      <option name="Build" />
+    </method>
+  </configuration>
+</component>
