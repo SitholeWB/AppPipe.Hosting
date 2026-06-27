@@ -2,6 +2,11 @@
 
 This reference guide provides an in-depth explanation of all features, topology options, configuration settings, deployment internals, and CI/CD pipelines available in **AppPipe.Hosting**.
 
+### 🌟 Alternative to Cloud-Only .NET Aspire
+While **.NET Aspire** is an excellent framework for microservices, it is heavily tailored for containerized, cloud-first hosting (Docker Desktop, Kubernetes, Azure Container Apps). In contrast, **AppPipe.Hosting** is designed specifically as a **lightweight, zero-container-dependency alternative** for traditional virtual machine (VM), bare-metal, and on-premises hosting environments. 
+
+It runs natively on **Windows (IIS / Windows Services)**, **Linux (systemd / Nginx / Caddy)**, and **macOS** with minimum CPU and memory overhead, requiring no Docker daemon or containerized execution hosts.
+
 ---
 
 ## ⚙️ Core Features & Capabilities
@@ -86,11 +91,11 @@ AppPipe exposes a local HTTP/2 Kestrel endpoint that acts as a fully compliant *
 * **Zero Configuration**: Microservices configure standard .NET OTLP exporters, which automatically detect and output telemetry to this local gateway.
 * **Structured Logs & Traces**: Captures structured console logs, distributed tracing spans, and resource metrics.
 
-### 3. Telemetry Store Persistence (SQLite by Default)
-By default, telemetry is stored in a persistent local SQLite database (`SqliteTelemetryStore`), which hydrates the dashboard memory cache on startup.
-* **Data Pruning**: Keeps database sizes bounded by retaining the last 2,000 logs, metrics, and trace IDs.
-* **In-Memory Fallback**: Can be configured to bypass the database and fall back to a circular in-memory buffer (`InMemoryTelemetryStore`) retaining a max buffer of **200 items**.
-* **Extensible Storage**: Developers can override this default store to persist telemetry to databases like PostgreSQL, SQL Server, or ClickHouse by implementing the `ITelemetryStore` interface.
+### 3. Extensible Telemetry Storage (SQLite as a Default)
+By default, telemetry is stored in a local SQLite database (`SqliteTelemetryStore`) so that persistence works out of the box without installing databases. However, this is strictly a default option:
+* **Enterprise Database Stores**: Developers can override this default store to persist telemetry to production databases like **PostgreSQL, ClickHouse, SQL Server, MySQL, or Elasticsearch** by implementing the custom `ITelemetryStore` interface.
+* **In-Memory Fallback**: SQLite database persistence can be disabled entirely (e.g. for developer builds or ephemeral staging VMs), letting AppPipe fallback to a lightweight circular in-memory buffer (`InMemoryTelemetryStore`) retaining a max cache of 500 items.
+* **Bounded Data Pruning**: SQLite and database providers are automatically configured to prune old records, keeping a maximum log, trace, and metric batch limit (defaulting to 500) to keep memory/disk footprints low.
 
 ### 4. Blazor Dashboard UI
 A visual dashboard that allows real-time diagnostics:
@@ -574,4 +579,60 @@ If the AppPool is failing, enable standard output logging by editing the `web.co
    ```
 2. Create a folder named `logs` in the published root directory.
 3. Access the application in the browser and read the crash log output saved in `.\logs\stdout_xxxxx.log`.
+
+
+---
+
+## 🛠️ Developer Guide: Working on the Repository
+
+This section guides developers on how to work inside the AppPipe.Hosting repository, compile the projects, run sample environments, and package/test NuGet templates.
+
+### 1. Prerequisites
+- **.NET 10.0 SDK** or higher
+- **PowerShell 7** (recommended for package automation)
+
+### 2. Repository Layout
+- **`AppPipe.Hosting/`**: Core library (Blazor server-side pages, YARP configuration, OTLP listener, SQLite store, process manager).
+- **`templates/AppPipeSystemTemplate/`**: Scaffolding source code packaged as `.NET templates`.
+- **`samples/`**: Test projects (`AppPipe.DevHost`, `BackendWorker`, `FrontendApi`) used to test the gateway runner and telemetry collection.
+- **`tests/`**: Unit and integration test suites.
+
+### 3. Local Run & Debugging
+To launch the developer sample environment locally (runs on Windows, Linux, and macOS):
+```bash
+# Navigate to the DevHost project
+cd samples/AppPipe.DevHost
+
+# Start the DevHost orchestrator
+dotnet run
+```
+This command compiles and launches the gateway proxy, boots the microservices on dynamic local ports, registers them, and configures OTLP telemetry back to the dashboard at `http://localhost:7001/dashboard`.
+
+### 4. Generating NuGet Packages
+You can pack the AppPipe gateway library and its templates pack locally using the standard .NET CLI:
+```bash
+# Build the solution in Release mode
+dotnet build -c Release
+
+# Pack the core hosting library (generates AppPipe.Hosting.<version>.nupkg in bin/Release)
+dotnet pack AppPipe.Hosting/AppPipe.Hosting.csproj -c Release
+
+# Pack the template pack (generates AppPipe.Hosting.Templates.<version>.nupkg)
+dotnet pack AppPipe.Hosting.Templates.csproj -c Release
+```
+
+### 5. Installing and Testing Local Templates
+To verify template edits locally before uploading to NuGet:
+```bash
+# Register the templates pack from the local folder
+dotnet new install templates/AppPipeSystemTemplate
+
+# Check that app-pipe template is listed
+dotnet new list app-pipe
+
+# Test scaffolding in a clean folder
+mkdir MyTestSystem
+cd MyTestSystem
+dotnet new app-pipe -n MyTestSystem
+```
 

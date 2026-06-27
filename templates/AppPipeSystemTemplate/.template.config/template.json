@@ -1,6 +1,6 @@
 {
   "$schema": "http://json.schemastore.org/template",
-  "author": "Welcome Bonginhlahla Sithole",
+  "author": "AppPipe",
   "classifications": [ "Common", "Console", "Web", "Orchestrator", "Gateway", "Solution" ],
   "name": "AppPipe Application Hosting",
   "identity": "AppPipe.Hosting.System.Template",

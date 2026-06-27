@@ -165,10 +165,19 @@ WantedBy=multi-user.target
             nginxConfig.AppendLine("    server_name localhost;");
             nginxConfig.AppendLine();
 
+            var basePath = string.IsNullOrEmpty(_options.Path) ? "" : _options.Path;
+            basePath = basePath.Trim('/');
+            if (!string.IsNullOrEmpty(basePath))
+                basePath = "/" + basePath;
+
             // Route for Gateway/Dashboard
             if (_app.HostProject != null)
             {
-                var customPath = _app.HostProject.AppPath;
+                var customPath = _app.HostProject.AppPath ?? $"/{_app.HostProject.Name}";
+                if (!string.IsNullOrEmpty(basePath))
+                {
+                    customPath = basePath + (customPath == "/" ? "" : "/" + customPath.TrimStart('/'));
+                }
                 var locationPath = (string.IsNullOrEmpty(customPath) || customPath == "/") ? "/" : "/" + customPath.Trim('/') + "/";
 
                 nginxConfig.AppendLine($"    location {locationPath} {{");
@@ -189,17 +198,20 @@ WantedBy=multi-user.target
             {
                 if (resource is AppPipeHostingProjectResource project)
                 {
-                    var customPath = project.AppPath;
-                    var paths = new List<string>();
+                    var customPath = project.AppPath ?? $"/{project.Name}";
+                    if (!string.IsNullOrEmpty(basePath))
+                    {
+                        customPath = basePath + "/" + customPath.TrimStart('/');
+                    }
 
+                    var paths = new List<string>();
                     if (!string.IsNullOrEmpty(customPath) && customPath != "/")
                     {
                         var trimmed = customPath.Trim('/');
                         paths.Add($"/{trimmed}/");
                     }
-                    else if (customPath != "/")
+                    else
                     {
-                        paths.Add($"/{project.Name}/");
                         paths.Add($"/{project.Name.ToLower()}/");
                     }
 
@@ -263,21 +275,29 @@ WantedBy=multi-user.target
             var caddyConfig = new System.Text.StringBuilder();
             caddyConfig.AppendLine(":80 {");
 
+            var basePath = string.IsNullOrEmpty(_options.Path) ? "" : _options.Path;
+            basePath = basePath.Trim('/');
+            if (!string.IsNullOrEmpty(basePath))
+                basePath = "/" + basePath;
+
             // Route for Child Projects
             foreach (var resource in _app.Resources)
             {
                 if (resource is AppPipeHostingProjectResource project)
                 {
-                    var customPath = project.AppPath;
-                    var paths = new List<string>();
+                    var customPath = project.AppPath ?? $"/{project.Name}";
+                    if (!string.IsNullOrEmpty(basePath))
+                    {
+                        customPath = basePath + "/" + customPath.TrimStart('/');
+                    }
 
+                    var paths = new List<string>();
                     if (!string.IsNullOrEmpty(customPath) && customPath != "/")
                     {
                         paths.Add(customPath.Trim('/'));
                     }
-                    else if (customPath != "/")
+                    else
                     {
-                        paths.Add(project.Name);
                         paths.Add(project.Name.ToLower());
                     }
 
@@ -293,7 +313,11 @@ WantedBy=multi-user.target
             // Route for Gateway/Dashboard (fallback)
             if (_app.HostProject != null)
             {
-                var customPath = _app.HostProject.AppPath;
+                var customPath = _app.HostProject.AppPath ?? $"/{_app.HostProject.Name}";
+                if (!string.IsNullOrEmpty(basePath))
+                {
+                    customPath = basePath + (customPath == "/" ? "" : "/" + customPath.TrimStart('/'));
+                }
                 var handlePath = (string.IsNullOrEmpty(customPath) || customPath == "/") ? "/*" : "/" + customPath.Trim('/') + "/*";
 
                 caddyConfig.AppendLine($"    handle {handlePath} {{");

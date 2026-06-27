@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageType>Template</PackageType>
     <PackageId>AppPipe.Hosting.Templates</PackageId>
-    <Version>1.5.1</Version>
+    <Version>1.5.2</Version>
     <Authors>Welcome Bonginhlahla Sithole</Authors>
     <Description>Template package containing the app-pipe multi-project solution template for AppPipe.Hosting gateway orchestrator.</Description>
     <PackageProjectUrl>https://github.com/SitholeWB/AppPipe.Hosting</PackageProjectUrl>
@@ -20,11 +20,12 @@
     <PackageReadmeFile>TEMPLATE_README.md</PackageReadmeFile>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <NoWarn>$(NoWarn);NU5128;NU5119</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="TEMPLATE_README.md" Pack="true" PackagePath="" />
-    <Content Include="templates\**" Exclude="templates\**\bin\**;templates\**\obj\**" Pack="true" PackagePath="content" />
+    <Content Include="templates\**" Exclude="templates\**\bin\**;templates\**\obj\**;templates\**\.vs\**;templates\**\.vscode\**;templates\**\.idea\**;templates\**\*.user" Pack="true" PackagePath="content" />
   </ItemGroup>
 
 </Project>

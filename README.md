@@ -4,9 +4,11 @@
 [![NuGet Downloads](https://img.shields.io/nuget/dt/AppPipe.Hosting.svg)](https://www.nuget.org/packages/AppPipe.Hosting)
 [![License](https://img.shields.io/github/license/SitholeWB/AppPipe.Hosting.svg)](https://github.com/SitholeWB/AppPipe.Hosting/blob/main/LICENSE)
 
-**AppPipe** (similar to *Aspire*) is a lightweight, on-premises alternative to the **.NET Aspire** dashboard and gateway runner. It is designed to orchestrate, route, and collect telemetry for microservice applications deployed on-premises (such as **IIS on Windows** or **systemd on Linux**). 
+**AppPipe** is a lightweight, zero-container-dependency alternative to the **.NET Aspire** dashboard and gateway runner. 
 
-With AppPipe, you get a beautiful, unified developer dashboard and service discovery proxy without the overhead of cloud-only architectures.
+While **.NET Aspire** is highly optimized for cloud-first deployments and relies heavily on local Docker/container runtimes, **AppPipe** is built specifically for traditional virtual machines, bare-metal servers, and on-premises environments across **Windows (IIS / Windows Services)**, **Linux (systemd / Nginx / Caddy)**, and **macOS**. 
+
+With AppPipe, you get a beautiful, unified developer dashboard, OpenTelemetry (OTLP) collection, and service discovery routing without the container dependencies or cloud-only overhead.
 
 ---
 
@@ -250,21 +252,23 @@ For a complete guide, step-by-step code samples, and auto-generated routing deta
 
 ---
 
-## 💾 Telemetry Database Persistence & Custom Stores
+## 💾 Extensible Telemetry Storage & Custom Databases
 
-By default, AppPipe persists all logs, traces, and metrics in a local SQLite database ([SqliteTelemetryStore](AppPipe.Hosting/Gateway/Services/SqliteTelemetryStore.cs)). This database is automatically created and hydrated on startup.
+By default, AppPipe persists logs, traces, and metrics in a local SQLite database ([SqliteTelemetryStore](AppPipe.Hosting/Gateway/Services/SqliteTelemetryStore.cs)). This provides zero-configuration persistence out of the box.
 
-If you want to disable database persistence or plug in another database (such as PostgreSQL, SQL Server, or ClickHouse), you can implement the [ITelemetryStore](AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and register it:
+However, SQLite is **strictly a default option**. AppPipe is fully database-agnostic. You can easily configure it to run entirely **in-memory** (using a ring buffer) or persist to enterprise databases like **PostgreSQL, ClickHouse, SQL Server, MySQL, or Elasticsearch** by implementing the [ITelemetryStore](AppPipe.Hosting/Gateway/Services/ITelemetryStore.cs) interface and registering it:
 
 ```csharp
 builder.ConfigureGateway(gatewayBuilder =>
 {
-    // Override the default SQLite persistence with your own database store
-    gatewayBuilder.Services.AddSingleton<ITelemetryStore, MyCustomDbTelemetryStore>();
+    // Override the default SQLite persistence with your custom store
+    gatewayBuilder.Services.AddSingleton<ITelemetryStore, ClickHouseTelemetryStore>();
 });
 ```
 
-For complete step-by-step code examples, see the [Custom Telemetry Database Configuration Guide](database-configuration.md).
+To run purely in-memory, set `Telemetry:PersistenceEnabled` to `false` in your `appsettings.json`.
+
+For details and step-by-step code examples, see the [Custom Telemetry Database Configuration Guide](database-configuration.md).
 
 ---
 
@@ -377,6 +381,60 @@ builder.AddProject("BackendWorker")
 
 ---
 
+## 🛠️ Developer Guide: Working on the Repository
+
+This section guides developers on how to work inside the AppPipe.Hosting repository, compile the projects, run sample environments, and package/test NuGet templates.
+
+### 1. Prerequisites
+- **.NET 10.0 SDK** or higher
+- **PowerShell 7** (recommended for package automation)
+
+### 2. Repository Layout
+- **`AppPipe.Hosting/`**: Core library (Blazor server-side pages, YARP configuration, OTLP listener, SQLite store, process manager).
+- **`templates/AppPipeSystemTemplate/`**: Scaffolding source code packaged as `.NET templates`.
+- **`samples/`**: Test projects (`AppPipe.DevHost`, `BackendWorker`, `FrontendApi`) used to test the gateway runner and telemetry collection.
+- **`tests/`**: Unit and integration test suites.
+
+### 3. Local Run & Debugging
+To launch the developer sample environment locally (runs on Windows, Linux, and macOS):
+```bash
+# Navigate to the DevHost project
+cd samples/AppPipe.DevHost
+
+# Start the DevHost orchestrator
+dotnet run
+```
+This command compiles and launches the gateway proxy, boots the microservices on dynamic local ports, registers them, and configures OTLP telemetry back to the dashboard at `http://localhost:7001/dashboard`.
+
+### 4. Generating NuGet Packages
+You can pack the AppPipe gateway library and its templates pack locally using the standard .NET CLI:
+```bash
+# Build the solution in Release mode
+dotnet build -c Release
+
+# Pack the core hosting library (generates AppPipe.Hosting.<version>.nupkg in bin/Release)
+dotnet pack AppPipe.Hosting/AppPipe.Hosting.csproj -c Release
+
+# Pack the template pack (generates AppPipe.Hosting.Templates.<version>.nupkg)
+dotnet pack AppPipe.Hosting.Templates.csproj -c Release
+```
+
+### 5. Installing and Testing Local Templates
+To verify template edits locally before uploading to NuGet:
+```bash
+# Register the templates pack from the local folder
+dotnet new install templates/AppPipeSystemTemplate
+
+# Check that app-pipe template is listed
+dotnet new list app-pipe
+
+# Test scaffolding in a clean folder
+mkdir MyTestSystem
+cd MyTestSystem
+dotnet new app-pipe -n MyTestSystem
+```
+
+---
 
 ## 📄 License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -57,7 +57,7 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
 
         if (_app.HostProject != null)
         {
-            var hostAppPath = _app.HostProject.AppPath ?? (string.IsNullOrEmpty(basePath) ? $"/{_app.HostProject.Name}" : basePath);
+            var hostAppPath = !string.IsNullOrEmpty(basePath) ? basePath : (_app.HostProject.AppPath ?? $"/{_app.HostProject.Name}");
             if (hostAppPath == "" || hostAppPath == "/")
                 hostAppPath = "/";
             else
@@ -77,7 +77,12 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
         {
             if (resource is AppPipeHostingProjectResource project)
             {
-                var appPath = project.AppPath ?? $"{basePath}/{project.Name}";
+                var appPath = project.AppPath ?? $"/{project.Name}";
+                if (!string.IsNullOrEmpty(basePath) && basePath != "/")
+                {
+                    appPath = basePath.TrimEnd('/') + "/" + appPath.TrimStart('/');
+                }
+
                 if (appPath == "" || appPath == "/")
                     appPath = "/";
                 else
@@ -94,7 +99,12 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
                 
                 foreach (var reference in project.References)
                 {
-                    var refAppPath = reference.AppPath ?? $"{basePath}/{reference.Name}";
+                    var refAppPath = reference.AppPath ?? $"/{reference.Name}";
+                    if (!string.IsNullOrEmpty(basePath) && basePath != "/")
+                    {
+                        refAppPath = basePath.TrimEnd('/') + "/" + refAppPath.TrimStart('/');
+                    }
+
                     if (refAppPath == "" || refAppPath == "/")
                         refAppPath = "/";
                     else

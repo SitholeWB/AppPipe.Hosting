@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AppPipe.Hosting" Version="1.5.0" />
+    <PackageReference Include="AppPipe.Hosting" Version="1.5.2" />
   </ItemGroup>
 
   <ItemGroup>
