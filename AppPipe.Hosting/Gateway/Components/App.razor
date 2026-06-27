@@ -7,7 +7,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <base href="@NavigationManager.BaseUri" />
+    <base href="@GetBaseHref()" />
     <link rel="stylesheet" href="_content/AppPipe.Hosting/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="_content/AppPipe.Hosting/app.css" />
     <link rel="stylesheet" href="@(System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name + ".styles.css")" />
@@ -65,4 +65,15 @@
 @code {
     private Microsoft.AspNetCore.Components.IComponentRenderMode CurrentRenderMode =>
         Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer;
+
+    private string GetBaseHref()
+    {
+        var baseUri = NavigationManager.BaseUri;
+        if (Uri.TryCreate(baseUri, UriKind.Absolute, out var uri))
+        {
+            var path = uri.AbsolutePath;
+            return path.EndsWith("/") ? path : path + "/";
+        }
+        return "/";
+    }
 }

@@ -204,6 +204,7 @@ public class GatewayAppPipeHost
             _app.UseHsts();
         }
 
+        _app.UseWebSockets();
         _app.UseAntiforgery();
 
         if (configureApp != null)
