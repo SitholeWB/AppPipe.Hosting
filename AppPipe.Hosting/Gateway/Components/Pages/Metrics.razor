@@ -1,4 +1,4 @@
-﻿@page "/metrics"
+@page "/metrics"
 @using AppPipe.Hosting
 @using Microsoft.Extensions.Configuration
 @using OpenTelemetry.Proto.Collector.Metrics.V1
@@ -594,7 +594,7 @@
         {
             try
             {
-                var stored = await JS.InvokeAsync<string?>("localStorage.getItem", LocalStorageKey);
+                var stored = await JS.InvokeAsync<string?>("apppipe_localstorage_get", LocalStorageKey);
                 if (!string.IsNullOrEmpty(stored) && serviceNames.Contains(stored))
                     selectedService = stored;
             }
@@ -736,9 +736,9 @@
         try
         {
             if (svc == null)
-                await JS.InvokeVoidAsync("localStorage.removeItem", LocalStorageKey);
+                await JS.InvokeVoidAsync("apppipe_localstorage_remove", LocalStorageKey);
             else
-                await JS.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, svc);
+                await JS.InvokeVoidAsync("apppipe_localstorage_set", LocalStorageKey, svc);
         }
         catch { /* ignore */ }
     }

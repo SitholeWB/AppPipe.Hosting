@@ -182,18 +182,7 @@
     }
 </div>
 
-<!-- Keyboard shortcut: / focuses search -->
-<script>
-    (function () {
-        document.addEventListener('keydown', function (e) {
-            if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-                e.preventDefault();
-                var el = document.getElementById('log-search');
-                if (el) el.focus();
-            }
-        });
-    })();
-</script>
+
 
 <style>
     .page-container { display: flex; flex-direction: column; height: 100%; gap: 1rem; }
@@ -309,9 +298,9 @@
         if (!firstRender) return;
         try
         {
-            var svc = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_logs_service");
-            var lvl = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_logs_level");
-            var rng = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_logs_timerange");
+            var svc = await JS.InvokeAsync<string?>("apppipe_localstorage_get", "apppipe_logs_service");
+            var lvl = await JS.InvokeAsync<string?>("apppipe_localstorage_get", "apppipe_logs_level");
+            var rng = await JS.InvokeAsync<string?>("apppipe_localstorage_get", "apppipe_logs_timerange");
 
             if (!string.IsNullOrEmpty(svc)) selectedService = svc;
             if (!string.IsNullOrEmpty(lvl)) selectedLevel = lvl;
@@ -398,21 +387,21 @@
     {
         selectedService = svc;
         currentPage = 1;
-        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_logs_service", svc ?? "");
+        await JS.InvokeVoidAsync("apppipe_localstorage_set", "apppipe_logs_service", svc ?? "");
     }
 
     private async Task SetLevel(string lvl)
     {
         selectedLevel = lvl;
         currentPage = 1;
-        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_logs_level", lvl);
+        await JS.InvokeVoidAsync("apppipe_localstorage_set", "apppipe_logs_level", lvl);
     }
 
     private async Task SetTimeRange(int mins)
     {
         selectedTimeRange = mins;
         currentPage = 1;
-        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_logs_timerange", mins.ToString());
+        await JS.InvokeVoidAsync("apppipe_localstorage_set", "apppipe_logs_timerange", mins.ToString());
     }
 
     private void FilterByAttr(string val)
@@ -443,7 +432,7 @@
         }
         var csv = sb.ToString();
         var b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(csv));
-        await JS.InvokeVoidAsync("eval", $"var a=document.createElement('a');a.href='data:text/csv;base64,{b64}';a.download='logs.csv';a.click()");
+        await JS.InvokeVoidAsync("apppipe_download_csv", "logs.csv", b64);
     }
 
     public void Dispose()

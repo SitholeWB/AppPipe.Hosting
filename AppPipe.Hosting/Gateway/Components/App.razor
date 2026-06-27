@@ -22,6 +22,42 @@
 <body>
     <Routes @rendermode="CurrentRenderMode" />
     <script src="_framework/blazor.web.js"></script>
+    <script>
+        window.apppipe_localstorage_get = (key) => localStorage.getItem(key);
+        window.apppipe_localstorage_set = (key, value) => localStorage.setItem(key, value);
+        window.apppipe_localstorage_remove = (key) => localStorage.removeItem(key);
+        window.apppipe_clipboard_copy = (text) => {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text);
+            } else {
+                var textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textArea);
+            }
+        };
+        window.apppipe_focus_element = (id) => {
+            var el = document.getElementById(id);
+            if (el) el.focus();
+        };
+        window.apppipe_download_csv = (filename, base64Content) => {
+            var link = document.createElement('a');
+            link.download = filename;
+            link.href = 'data:text/csv;base64,' + base64Content;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+        document.addEventListener('keydown', function (e) {
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                var el = document.getElementById('log-search');
+                if (el) el.focus();
+            }
+        });
+    </script>
 </body>
 
 </html>

@@ -443,9 +443,9 @@
         if (!firstRender) return;
         try
         {
-            var svc = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_traces_service");
-            var sts = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_traces_status");
-            var slw = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_traces_slow");
+            var svc = await JS.InvokeAsync<string?>("apppipe_localstorage_get", "apppipe_traces_service");
+            var sts = await JS.InvokeAsync<string?>("apppipe_localstorage_get", "apppipe_traces_status");
+            var slw = await JS.InvokeAsync<string?>("apppipe_localstorage_get", "apppipe_traces_slow");
 
             if (!string.IsNullOrEmpty(svc)) selectedService = svc;
             if (!string.IsNullOrEmpty(sts)) selectedStatus = sts;
@@ -513,24 +513,24 @@
     private async Task SetService(string? svc)
     {
         selectedService = svc; currentPage = 1;
-        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_traces_service", svc ?? "");
+        await JS.InvokeVoidAsync("apppipe_localstorage_set", "apppipe_traces_service", svc ?? "");
     }
 
     private async Task SetStatus(string sts)
     {
         selectedStatus = sts; currentPage = 1;
-        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_traces_status", sts);
+        await JS.InvokeVoidAsync("apppipe_localstorage_set", "apppipe_traces_status", sts);
     }
 
     private async Task SetSlow(int ms)
     {
         slowThreshold = ms; currentPage = 1;
-        await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_traces_slow", ms.ToString());
+        await JS.InvokeVoidAsync("apppipe_localstorage_set", "apppipe_traces_slow", ms.ToString());
     }
 
     private async Task CopyTraceId(string traceId)
     {
-        try { await JS.InvokeVoidAsync("navigator.clipboard.writeText", traceId); }
+        try { await JS.InvokeVoidAsync("apppipe_clipboard_copy", traceId); }
         catch { }
     }
 
