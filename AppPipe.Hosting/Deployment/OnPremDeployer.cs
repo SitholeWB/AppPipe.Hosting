@@ -26,11 +26,15 @@ public class DeploymentOptions
 
 public class OnPremDeployer
 {
-    public static async Task CompileToOnPremAsync(AppPipeHostingApp app, DeploymentTarget target = DeploymentTarget.IIS, string path = "")
+    public static async Task CompileToOnPremAsync(
+        AppPipeHostingApp app, 
+        DeploymentTarget target = DeploymentTarget.IIS, 
+        string path = "", 
+        Action<PipelineHostBuilder>? configurePipeline = null)
     {
         Console.WriteLine($"Starting AppPipe ModularPipelines Deployment targeting {target}...");
         
-        var pipeline = await PipelineHostBuilder.Create()
+        var builder = PipelineHostBuilder.Create()
             .ConfigureServices((context, services) =>
             {
                 services.AddSingleton(app);
@@ -56,8 +60,14 @@ public class OnPremDeployer
                 {
                     services.AddModule<LinuxSystemdDeploymentModule>();
                 }
-            })
-            .ExecutePipelineAsync();
+            });
+
+        if (configurePipeline != null)
+        {
+            configurePipeline(builder);
+        }
+
+        var pipeline = await builder.ExecutePipelineAsync();
             
         Console.WriteLine("Deployment Pipeline Complete!");
     }

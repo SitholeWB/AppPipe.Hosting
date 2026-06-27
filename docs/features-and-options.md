@@ -583,6 +583,82 @@ If the AppPool is failing, enable standard output logging by editing the `web.co
 
 ---
 
+## 🔧 Customizing the Deployment Pipeline with ModularPipelines
+
+AppPipe's deployment engine is built on top of **ModularPipelines**—a type-safe, asynchronous C# build and deployment pipeline framework. Since all deployment modules (e.g., publishing, IIS mapping, systemd config) are public classes, you can leverage standard ModularPipelines features or inject your own custom modules.
+
+### Option 1: Using the `OnPremDeployer` Delegate (Recommended)
+You can pass an optional `Action<PipelineHostBuilder>` delegate to `OnPremDeployer.CompileToOnPremAsync`. This allows you to register custom modules or services on the container:
+
+```csharp
+// Program.cs inside your AppHost project
+await OnPremDeployer.CompileToOnPremAsync(app, target, deployPath, pipelineBuilder =>
+{
+    pipelineBuilder.ConfigureServices((context, services) =>
+    {
+        // 1. Add your custom ModularPipelines modules
+        services.AddModule<RunDbMigrationsModule>();
+        services.AddModule<NotifySlackOnCompletionModule>();
+    });
+});
+```
+
+Here is an example of a custom module that notifies Slack after the deployment completes:
+
+```csharp
+using System.Net.Http;
+using System.Net.Http.Json;
+using ModularPipelines.Attributes;
+using ModularPipelines.Context;
+using ModularPipelines.Modules;
+
+// DependsOn guarantees this module executes AFTER the IIS/Linux module completes
+[DependsOn<WindowsIISDeploymentModule>]
+public class NotifySlackOnCompletionModule : Module<HttpResponseMessage>
+{
+    protected override async Task<HttpResponseMessage?> ExecuteAsync(IPipelineContext context, CancellationToken cancellationToken)
+    {
+        context.Logger.LogInformation("Sending Slack notification...");
+        
+        using var client = new HttpClient();
+        var response = await client.PostAsJsonAsync("https://hooks.slack.com/services/YOUR/WEBHOOK/URL", new
+        {
+            text = "🚀 AppPipe Microservices successfully deployed on-premises!"
+        }, cancellationToken);
+        
+        return response;
+    }
+}
+```
+
+### Option 2: Composing a Custom Pipeline from Scratch
+If you want absolute control over the pipeline execution structure, you can bypass `OnPremDeployer` entirely and build your own pipeline using `PipelineHostBuilder.Create()`, registering AppPipe's built-in modules alongside your own:
+
+```csharp
+using ModularPipelines.Host;
+using AppPipe.Hosting;
+
+var app = builder.Build();
+
+var pipeline = await PipelineHostBuilder.Create()
+    .ConfigureServices((context, services) =>
+    {
+        services.AddSingleton(app);
+        services.AddSingleton(new DeploymentOptions { Target = DeploymentTarget.IIS });
+
+        // Register AppPipe default modules
+        services.AddModule<PublishProjectsModule>();
+        services.AddModule<WindowsIISDeploymentModule>();
+
+        // Register custom modules
+        services.AddModule<BackupFolderModule>();
+        services.AddModule<RunDbMigrationsModule>();
+    })
+    .ExecutePipelineAsync();
+```
+
+---
+
 ## 🛠️ Developer Guide: Working on the Repository
 
 This section guides developers on how to work inside the AppPipe.Hosting repository, compile the projects, run sample environments, and package/test NuGet templates.
