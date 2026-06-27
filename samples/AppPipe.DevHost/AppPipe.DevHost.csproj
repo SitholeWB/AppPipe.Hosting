@@ -2,8 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\AppPipe.Hosting\AppPipe.Hosting.csproj" />
-    <ProjectReference Include="..\BackendWorker\BackendWorker.csproj" />
-    <ProjectReference Include="..\FrontendApi\FrontendApi.csproj" />
+    <ProjectReference Include="..\BackendWorker\BackendWorker.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\FrontendApi\FrontendApi.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <PropertyGroup>

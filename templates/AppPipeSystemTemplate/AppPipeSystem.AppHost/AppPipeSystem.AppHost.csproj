@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,16 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="AppPipe.Hosting" Version="1.5.3" />
+    <PackageReference Include="AppPipe.Hosting" Version="1.5.4" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AppPipeSystem.ApiService\AppPipeSystem.ApiService.csproj" />
-    <ProjectReference Include="..\AppPipeSystem.Web\AppPipeSystem.Web.csproj" />
+    <ProjectReference Include="..\AppPipeSystem.ApiService\AppPipeSystem.ApiService.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\AppPipeSystem.Web\AppPipeSystem.Web.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
