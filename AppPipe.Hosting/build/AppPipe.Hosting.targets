@@ -2,11 +2,11 @@
   <PropertyGroup>
     <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
-  <Target Name="ConfigureAppPipeProjectReferences" BeforeTargets="ResolveProjectReferences;BeforeBuild">
+  <!-- Automatically inject decoupling metadata to ProjectReference items at the start of build configuration -->
+  <!-- We skip AppPipe.Hosting.csproj itself -->
+  <Target Name="ConfigureAppPipeProjectReferences" BeforeTargets="AssignProjectConfiguration;ResolveProjectReferences;BeforeBuild">
     <ItemGroup>
-      <!-- Automatically inject decoupling metadata to ProjectReference items unless they explicitly opt out via AppProject="false" -->
-      <!-- We also skip AppPipe.Hosting.csproj itself -->
-      <ProjectReference Condition="!$([System.String]::new('%(Identity)').Contains('AppPipe.Hosting.csproj')) and '%(ProjectReference.AppProject)' != 'false'">
+      <ProjectReference Condition="!$([System.String]::new('%(Identity)').Contains('AppPipe.Hosting.csproj'))">
         <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
         <Private>false</Private>
