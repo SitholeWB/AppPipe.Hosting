@@ -189,16 +189,24 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
 
         try
         {
-            try
+            var appPoolExists = await AppPoolExistsAsync(context, appCmdPath, appPoolName, cancellationToken);
+            if (!appPoolExists)
             {
-                // Create AppPool
-                var appPoolResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                try
                 {
-                    Arguments = new[] { "add", "apppool", $"/name:{appPoolName}" }
-                }, cancellationToken);
-                results.Add(appPoolResult);
+                    // Create AppPool
+                    var appPoolResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                    {
+                        Arguments = new[] { "add", "apppool", $"/name:{appPoolName}" }
+                    }, cancellationToken);
+                    results.Add(appPoolResult);
+                }
+                catch (Exception ex) { context.Logger.LogWarning($"AppPool warning: {ex.Message}"); }
             }
-            catch (Exception ex) { context.Logger.LogWarning($"AppPool warning: {ex.Message}"); }
+            else
+            {
+                context.Logger.LogInformation($"IIS AppPool '{appPoolName}' already exists. Skipping creation.");
+            }
 
             if (!string.IsNullOrEmpty(project.ServiceAccount))
             {
@@ -231,11 +239,31 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
                 catch (Exception ex) { context.Logger.LogWarning($"Failed to set AppPool identity: {ex.Message}"); }
             }
 
+            // Check if the configured IIS Site exists, and create it if it doesn't
+            var siteExists = await SiteExistsAsync(context, appCmdPath, siteName, cancellationToken);
+            if (!siteExists)
+            {
+                context.Logger.LogInformation($"IIS Site '{siteName}' does not exist. Creating it automatically...");
+                try
+                {
+                    var port = project.AssignedPort > 0 ? project.AssignedPort : 80;
+                    var createSiteResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+                    {
+                        Arguments = new[] { "add", "site", $"/name:{siteName}", $"/bindings:http/*:{port}:", $"/physicalPath:{publishPath}" }
+                    }, cancellationToken);
+                    results.Add(createSiteResult);
+                }
+                catch (Exception ex)
+                {
+                    context.Logger.LogError($"Failed to create IIS site '{siteName}': {ex.Message}");
+                }
+            }
+
             if (appPath == "/")
             {
                 try
                 {
-                    // For root app, set the app pool and physical path on the default site root application
+                    // For root app, set the app pool and physical path on the site root application
                     var poolResult = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
                     {
                         Arguments = new[] { "set", "app", $"{siteName}/", $"/applicationPool:{appPoolName}" }
@@ -283,6 +311,40 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
         catch (Exception ex)
         {
             context.Logger.LogWarning($"Failed to run appcmd.exe. Are you running as Administrator? Error: {ex.Message}");
+        }
+    }
+
+    private async Task<bool> AppPoolExistsAsync(IPipelineContext context, string appCmdPath, string appPoolName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+            {
+                Arguments = new[] { "list", "apppool", $"/name:{appPoolName}" }
+            }, cancellationToken);
+
+            return !string.IsNullOrEmpty(result.StandardOutput) && result.StandardOutput.Contains(appPoolName);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task<bool> SiteExistsAsync(IPipelineContext context, string appCmdPath, string siteName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions(appCmdPath)
+            {
+                Arguments = new[] { "list", "site", $"/name:{siteName}" }
+            }, cancellationToken);
+
+            return !string.IsNullOrEmpty(result.StandardOutput) && result.StandardOutput.Contains(siteName);
+        }
+        catch
+        {
+            return false;
         }
     }
 }

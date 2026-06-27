@@ -127,6 +127,13 @@ public class GatewayAppPipeHost
             .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
         _app = builder.Build();
+        
+        var pathBase = topology?.HostProject?.AppPath;
+        if (!string.IsNullOrEmpty(pathBase) && pathBase != "/")
+        {
+            _app.UsePathBase(pathBase);
+        }
+
         var _logger = _app.Services.GetRequiredService<ILogger<GatewayAppPipeHost>>();
         // Gateway Diagnostics Middleware
         _app.Use(async (context, next) =>

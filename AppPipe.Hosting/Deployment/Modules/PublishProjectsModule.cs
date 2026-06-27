@@ -147,13 +147,25 @@ public class PublishProjectsModule : Module<CommandResult[]>
         if (Directory.Exists(path))
         {
             context.Logger.LogInformation($"Cleaning target publish folder: {path}...");
-            try
+            for (int i = 0; i < 3; i++)
             {
-                Directory.Delete(path, true);
-            }
-            catch (Exception ex)
-            {
-                context.Logger.LogWarning($"Warning: Failed to clean directory {path}: {ex.Message}. It may contain locked files.");
+                try
+                {
+                    Directory.Delete(path, true);
+                    return; // Successfully deleted
+                }
+                catch (Exception ex)
+                {
+                    if (i == 2) // Last try failed
+                    {
+                        context.Logger.LogWarning($"Warning: Failed to clean directory {path}: {ex.Message}. It may contain locked files.");
+                    }
+                    else
+                    {
+                        context.Logger.LogInformation($"Retrying directory clean after delay ({i + 1}/3)...");
+                        Thread.Sleep(1000);
+                    }
+                }
             }
         }
     }
