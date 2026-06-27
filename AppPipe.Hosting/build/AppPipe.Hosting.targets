@@ -12,6 +12,8 @@
         <Private>false</Private>
         <PrivateAssets>All</PrivateAssets>
         <ExcludeAssets>All</ExcludeAssets>
+        <Properties Condition="'%(ProjectReference.Properties)' != ''">%(ProjectReference.Properties);StaticWebAssetsEnabled=false</Properties>
+        <Properties Condition="'%(ProjectReference.Properties)' == ''">StaticWebAssetsEnabled=false</Properties>
       </ProjectReference>
     </ItemGroup>
   </Target>
