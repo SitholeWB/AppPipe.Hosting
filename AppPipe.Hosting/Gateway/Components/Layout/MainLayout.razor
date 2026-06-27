@@ -369,7 +369,7 @@
         if (!firstRender) return;
         try
         {
-            var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "apppipe_theme");
+            var saved = await JS.InvokeAsync<string?>("apppipe_localstorage_get", "apppipe_theme");
             if (!string.IsNullOrEmpty(saved) && (saved == "dark" || saved == "light"))
             {
                 currentTheme = saved;
@@ -389,7 +389,7 @@
         currentTheme = currentTheme == "dark" ? "light" : "dark";
         try
         {
-            await JS.InvokeVoidAsync("localStorage.setItem", "apppipe_theme", currentTheme);
+            await JS.InvokeVoidAsync("apppipe_localstorage_set", "apppipe_theme", currentTheme);
             await ApplyThemeToBody();
         }
         catch { }
@@ -398,7 +398,6 @@
     private async Task ApplyThemeToBody()
     {
         // Apply data-theme to <html> so body background also responds correctly
-        await JS.InvokeVoidAsync("eval",
-            $"document.documentElement.setAttribute('data-theme', '{currentTheme}')");
+        await JS.InvokeVoidAsync("apppipe_set_theme", currentTheme);
     }
 }

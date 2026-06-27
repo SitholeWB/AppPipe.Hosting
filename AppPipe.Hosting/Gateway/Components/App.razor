@@ -26,6 +26,7 @@
         window.apppipe_localstorage_get = (key) => localStorage.getItem(key);
         window.apppipe_localstorage_set = (key, value) => localStorage.setItem(key, value);
         window.apppipe_localstorage_remove = (key) => localStorage.removeItem(key);
+        window.apppipe_set_theme = (theme) => document.documentElement.setAttribute('data-theme', theme);
         window.apppipe_clipboard_copy = (text) => {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(text);

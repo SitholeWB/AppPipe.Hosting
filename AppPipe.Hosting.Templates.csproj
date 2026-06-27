@@ -3,7 +3,7 @@
   <PropertyGroup>
     <PackageType>Template</PackageType>
     <PackageId>AppPipe.Hosting.Templates</PackageId>
-    <Version>1.6.2</Version>
+    <Version>1.6.3</Version>
     <Authors>Welcome Bonginhlahla Sithole</Authors>
     <Description>Template package containing the app-pipe multi-project solution template for AppPipe.Hosting gateway orchestrator.</Description>
     <PackageProjectUrl>https://github.com/SitholeWB/AppPipe.Hosting</PackageProjectUrl>
