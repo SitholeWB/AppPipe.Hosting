@@ -1,0 +1,363 @@
+@namespace AppPipeProjectTest.Web.Components
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Forms
+@inject IHttpClientFactory ClientFactory
+@inject ILogger<App> Logger
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AppPipe Products Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-color: #4f46e5;
+            --accent-hover: #6366f1;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 2rem 1rem;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2.5rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        header {
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .badge {
+            background: rgba(79, 70, 229, 0.2);
+            color: #a5b4fc;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1px solid rgba(79, 70, 229, 0.4);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @@media (min-width: 768px) {
+            .grid {
+                grid-template-columns: 1.2fr 0.8fr;
+            }
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 1.25rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            font-family: inherit;
+            box-sizing: border-box;
+            transition: all 0.2s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        button {
+            width: 100%;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.85rem;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .product-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .product-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            transition: transform 0.2s ease;
+        }
+
+        .product-item:hover {
+            transform: scale(1.01);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .product-info h3 {
+            margin: 0 0 0.25rem 0;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .product-info p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .product-price {
+            font-weight: 700;
+            color: #34d399;
+        }
+
+        .no-products {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 2rem;
+            font-style: italic;
+        }
+
+        .alert {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+        .alert-success {
+            background: rgba(52, 211, 153, 0.15);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            color: #34d399;
+        }
+        .alert-error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AppPipe Products</h1>
+            <span class="badge">Blazor SSR Mode</span>
+        </header>
+
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="alert @(isError ? "alert-error" : "alert-success")">
+                @statusMessage
+            </div>
+        }
+
+        <div class="grid">
+            <div class="card">
+                <h2>Active Products</h2>
+                <div class="product-list">
+                    @if (products == null || !products.Any())
+                    {
+                        <div class="no-products">No products found. Add one on the right!</div>
+                    }
+                    else
+                    {
+                        @foreach (var p in products)
+                        {
+                            <div class="product-item">
+                                <div class="product-info">
+                                    <h3>@p.Name</h3>
+                                    <p>ID: @p.Id.ToString().Substring(0, 8)...</p>
+                                </div>
+                                <div class="product-price">$@p.Price.ToString("F2")</div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Add Product</h2>
+                <form method="post" @onsubmit="HandleSubmit" @formname="addProduct">
+                    <AntiforgeryToken />
+                    <div class="form-group">
+                        <label for="name">Product Name</label>
+                        <input type="text" id="name" name="newProductName" @bind="newProductName" placeholder="e.g. Cloud License" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="price">Price (USD)</label>
+                        <input type="number" id="price" name="newProductPrice" @bind="newProductPrice" step="0.01" min="0.01" required />
+                    </div>
+                    <button type="submit">Create Product</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+@code {
+    private List<ProductItem>? products;
+    private string newProductName = "";
+    private decimal newProductPrice = 0.01m;
+    private string statusMessage = "";
+    private bool isError = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        try
+        {
+            var client = ClientFactory.CreateClient("ApiService");
+            products = await client.GetFromJsonAsync<List<ProductItem>>("products");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load products");
+            statusMessage = "Could not connect to backend ApiService.";
+            isError = true;
+            products = new();
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(newProductName)) return;
+
+        try
+        {
+            var client = ClientFactory.CreateClient("ApiService");
+
+#if UseJwtAuth
+            // Obtain mock token first
+            var tokenResponse = await client.PostAsync("auth/token", null);
+            if (tokenResponse.IsSuccessStatusCode)
+            {
+                var tokenObj = await tokenResponse.Content.ReadFromJsonAsync<TokenResult>();
+                if (tokenObj != null && !string.IsNullOrEmpty(tokenObj.Token))
+                {
+                    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenObj.Token);
+                }
+            }
+#endif
+
+            var command = new { Name = newProductName, Price = newProductPrice };
+            var response = await client.PostAsJsonAsync("products", command);
+
+            if (response.IsSuccessStatusCode)
+            {
+                statusMessage = $"Product '{newProductName}' created successfully!";
+                isError = false;
+                newProductName = "";
+                newProductPrice = 0.01m;
+                await LoadProducts();
+            }
+            else
+            {
+                statusMessage = $"Failed to create product. Status: {response.StatusCode}";
+                isError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create product");
+            statusMessage = "Error communicating with backend ApiService.";
+            isError = true;
+        }
+    }
+
+    public class ProductItem
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+    }
+
+    public class TokenResult
+    {
+        public string Token { get; set; } = string.Empty;
+    }
+}

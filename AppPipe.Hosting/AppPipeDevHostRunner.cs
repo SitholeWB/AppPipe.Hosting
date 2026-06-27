@@ -56,8 +56,10 @@ public class AppPipeDevHostRunner
         // 2. Start Gateway Internally
         var gatewayHost = new GatewayAppPipeHost();
         var ports = await gatewayHost.StartAsync(yarpConfigFile, _app, _app.ConfigureGatewayAction);
+        var pathBase = _app.HostProject?.AppPath ?? "";
+        if (pathBase == "/") pathBase = "";
         Console.WriteLine($"AppPipe Gateway (Dashboard & Proxy) started on http://localhost:{ports.DashboardPort}");
-        Console.WriteLine($"-> Dashboard: http://localhost:{ports.DashboardPort}/dashboard");
+        Console.WriteLine($"-> Dashboard: http://localhost:{ports.DashboardPort}{pathBase}/dashboard");
         Console.WriteLine($"-> Telemetry: http://localhost:{ports.TelemetryPort}");
 
         // 3. Start Child Projects

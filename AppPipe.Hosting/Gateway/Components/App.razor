@@ -52,7 +52,7 @@
             document.body.removeChild(link);
         };
         document.addEventListener('keydown', function (e) {
-            if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+            if (e.key === '/' && document.activeElement && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
                 e.preventDefault();
                 var el = document.getElementById('log-search');
                 if (el) el.focus();

@@ -1,0 +1,5 @@
+{ "ReverseProxy": { "Routes": {
+"AppPipeProjectTest.ApiServiceRoute": { "ClusterId": "AppPipeProjectTest.ApiServiceCluster", "Match": { "Path": "/apppipeprojecttest.apiservice/{**catch-all}" } },"AppPipeProjectTest.WebRoute": { "ClusterId": "AppPipeProjectTest.WebCluster", "Match": { "Path": "/apppipeprojecttest.web/{**catch-all}" } }
+}, "Clusters": {
+"AppPipeProjectTest.ApiServiceCluster": { "Destinations": { "destination1": { "Address": "http://localhost:7152/" } } },"AppPipeProjectTest.WebCluster": { "Destinations": { "destination1": { "Address": "http://localhost:7153/" } } }
+} } }

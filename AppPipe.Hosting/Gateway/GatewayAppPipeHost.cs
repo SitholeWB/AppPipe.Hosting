@@ -23,6 +23,8 @@ public class GatewayAppPipeHost
             ApplicationName = System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name ?? "AppPipe.Hosting"
         });
 
+        builder.WebHost.UseStaticWebAssets();
+
         var dashboardPort = topology?.HostProject?.AssignedPort ?? 0;
 
         var isIIS = Environment.GetEnvironmentVariable("APP_POOL_ID") != null;

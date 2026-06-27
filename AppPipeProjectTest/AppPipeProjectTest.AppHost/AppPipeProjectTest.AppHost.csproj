@@ -8,12 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AppPipe.Hosting" Version="1.6.7" />
+    <PackageReference Include="AppPipe.Hosting" Version="1.6.6" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AppPipeSystem.ApiService\AppPipeSystem.ApiService.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\AppPipeSystem.Web\AppPipeSystem.Web.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\AppPipeProjectTest.ApiService\AppPipeProjectTest.ApiService.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\AppPipeProjectTest.Web\AppPipeProjectTest.Web.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
