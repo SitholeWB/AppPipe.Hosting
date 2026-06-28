@@ -8,7 +8,7 @@
 
     <!-- NuGet Metadata -->
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.6.7</Version>
+    <Version>2.0.0</Version>
     <Authors>Welcome Bonginhlahla Sithole</Authors>
     <Company>Welcome Bonginhlahla Sithole</Company>
     <Description>A lightweight telemetry dashboard and service discovery gateway runner for microservices, serving as an on-premises alternative to .NET Aspire dashboard. Supports IIS and Linux deployment with dynamic port bindings and OTLP metrics, logs, and traces.</Description>
@@ -18,6 +18,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>aspire;telemetry;otlp;iis;dashboard;gateway;microservices;dotnet;dotnet-aspire;opentelemetry</PackageTags>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
   </PropertyGroup>
 
   <ItemGroup>

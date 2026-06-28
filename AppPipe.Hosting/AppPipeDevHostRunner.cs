@@ -56,11 +56,27 @@ public class AppPipeDevHostRunner
         // 2. Start Gateway Internally
         var gatewayHost = new GatewayAppPipeHost();
         var ports = await gatewayHost.StartAsync(yarpConfigFile, _app, _app.ConfigureGatewayAction);
-        var pathBase = _app.HostProject?.AppPath ?? "";
+        var isIIS = Environment.GetEnvironmentVariable("APP_POOL_ID") != null;
+        var pathBase = isIIS ? (_app.HostProject?.AppPath ?? "") : "";
         if (pathBase == "/") pathBase = "";
+        var dashboardUrl = $"http://localhost:{ports.DashboardPort}{pathBase}/dashboard";
         Console.WriteLine($"AppPipe Gateway (Dashboard & Proxy) started on http://localhost:{ports.DashboardPort}");
-        Console.WriteLine($"-> Dashboard: http://localhost:{ports.DashboardPort}{pathBase}/dashboard");
+        Console.WriteLine($"-> Dashboard: {dashboardUrl}");
         Console.WriteLine($"-> Telemetry: http://localhost:{ports.TelemetryPort}");
+
+        // Automatically launch default browser on start
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = dashboardUrl,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to automatically launch browser: {ex.Message}");
+        }
 
         // 3. Start Child Projects
         var tasks = new List<Task>();

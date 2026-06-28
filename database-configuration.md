@@ -43,7 +43,7 @@ namespace AppPipe.Gateway.Services;
 
 public interface ITelemetryStore
 {
-    // Properties used by the Blazor Dashboard to render telemetry:
+    // Properties used by the Dashboard UI to render telemetry:
     ConcurrentDictionary<string, ParsedTrace> Traces { get; }
     ConcurrentQueue<ParsedLog> Logs { get; }
     ConcurrentQueue<ExportMetricsServiceRequest> Metrics { get; }
@@ -53,7 +53,7 @@ public interface ITelemetryStore
     void AddLog(ExportLogsServiceRequest request);
     void AddMetric(ExportMetricsServiceRequest metric);
     
-    // Event to notify the Blazor UI to refresh (relevant in Interactive/WebSocket mode)
+    // Event to notify the Dashboard UI to refresh
     event Action? OnTelemetryReceived;
 }
 ```
@@ -78,7 +78,7 @@ using OpenTelemetry.Proto.Collector.Metrics.V1;
 
 public class SqliteTelemetryStore : ITelemetryStore
 {
-    // Return telemetry from database to supply the Blazor UI:
+    // Return telemetry from database to supply the Dashboard UI:
     public ConcurrentDictionary<string, ParsedTrace> Traces => LoadTracesFromDatabase();
     public ConcurrentQueue<ParsedLog> Logs => LoadLogsFromDatabase();
     public ConcurrentQueue<ExportMetricsServiceRequest> Metrics => LoadMetricsFromDatabase();

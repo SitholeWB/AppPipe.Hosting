@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -66,8 +67,7 @@ public class GatewayAppPipeHost
 
         // Add services to the container.
         builder.Services.AddWindowsService();
-        builder.Services.AddRazorComponents()
-            .AddInteractiveServerComponents();
+        builder.Services.AddRazorPages();
 
         builder.Services.Insert(0, ServiceDescriptor.Transient<IStartupFilter, TelemetryPortTokenRemoverFilter>());
 
@@ -131,7 +131,7 @@ public class GatewayAppPipeHost
         _app = builder.Build();
         
         var pathBase = topology?.HostProject?.AppPath;
-        if (!string.IsNullOrEmpty(pathBase) && pathBase != "/")
+        if (isIIS && !string.IsNullOrEmpty(pathBase) && pathBase != "/")
         {
             _app.UsePathBase(pathBase);
         }
@@ -202,32 +202,124 @@ public class GatewayAppPipeHost
 
         if (!_app.Environment.IsDevelopment())
         {
-            _app.UseExceptionHandler("/Error", createScopeForErrors: true);
             _app.UseHsts();
         }
-
-        _app.UseWebSockets();
-        _app.UseAntiforgery();
 
         if (configureApp != null)
         {
             configureApp(_app);
         }
 
-        try
+        _app.UseStaticFiles();
+        _app.UseRouting();
+
+        // Redirect root address to the dashboard Razor Page
+        _app.MapGet("/", (HttpContext context) => Results.Redirect(context.Request.PathBase + "/dashboard"));
+        _app.MapGet("/logs", (HttpContext context) => Results.Redirect(context.Request.PathBase + "/dashboard/logs"));
+        _app.MapGet("/traces", (HttpContext context) => Results.Redirect(context.Request.PathBase + "/dashboard/traces"));
+        _app.MapGet("/metrics", (HttpContext context) => Results.Redirect(context.Request.PathBase + "/dashboard/metrics"));
+        _app.MapGet("/service-map", (HttpContext context) => Results.Redirect(context.Request.PathBase + "/dashboard/service-map"));
+
+        _app.MapRazorPages();
+
+        // REST JSON API endpoints for the HTML5 dashboard
+        _app.MapGet("/api/services", (AppPipeHostingApp? topology) =>
         {
-            _app.MapStaticAssets();
-        }
-        catch (InvalidOperationException ex) when (string.Equals(ex.Source, "Microsoft.AspNetCore.StaticAssets", StringComparison.OrdinalIgnoreCase))
+            if (topology == null) return Results.Json(Array.Empty<object>());
+            
+            object MapResource(AppPipeHostingResource r, string type) => new
+            {
+                name = r.Name,
+                port = r.AssignedPort,
+                type = type,
+                appPath = r.AppPath,
+                siteName = r.IISSiteName,
+                poolName = r.AppPoolName,
+                projectPath = (r is AppPipeHostingProjectResource pr) ? pr.ProjectPath : null,
+                command = (r is ExecutableAppPipeHostingResource er1) ? er1.Command : null,
+                workingDirectory = (r is ExecutableAppPipeHostingResource er2) ? er2.WorkingDirectory : null,
+                args = (r is ExecutableAppPipeHostingResource er3) ? er3.Args : null,
+                references = r.References.Select(refR => refR.Name).ToArray(),
+                waitDependencies = r.WaitDependencies.Select(waitR => waitR.Name).ToArray(),
+                envVars = r.EnvironmentVariables,
+                displayName = r.ServiceDisplayName,
+                description = r.ServiceDescription,
+                startType = r.ServiceStartType,
+                account = r.ServiceAccount,
+                hostingModel = r.HostingModel
+            };
+
+            var servicesList = new List<object>();
+            if (topology.HostProject != null)
+            {
+                servicesList.Add(MapResource(topology.HostProject, "HostProject"));
+            }
+            foreach (var resource in topology.Resources)
+            {
+                var type = resource is AppPipeHostingProjectResource ? "Project" :
+                           resource is ExecutableAppPipeHostingResource ? "Executable" : "Resource";
+                servicesList.Add(MapResource(resource, type));
+            }
+            return Results.Json(servicesList);
+        });
+
+        _app.MapGet("/api/logs", (ITelemetryStore store) => Results.Json(store.Logs.ToArray()));
+
+        _app.MapGet("/api/traces", (ITelemetryStore store) => Results.Json(store.Traces.Values.ToArray()));
+
+        _app.MapGet("/api/metrics", (ITelemetryStore store) =>
         {
-            _app.UseStaticFiles();
-            _logger.LogWarning(ex, "[AppPipe.Hosting] Static web assets not found. Ensure that the project is built and the static web assets are published.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[AppPipe.Hosting] Error while mapping static assets.");
-            throw;
-        }
+            var points = new List<object>();
+            foreach (var request in store.Metrics)
+            {
+                if (request.ResourceMetrics == null) continue;
+                foreach (var rm in request.ResourceMetrics)
+                {
+                    var serviceName = rm.Resource?.Attributes
+                        .FirstOrDefault(a => a.Key == "service.name")?.Value.StringValue ?? "Unknown Service";
+
+                    if (rm.ScopeMetrics == null) continue;
+                    foreach (var sm in rm.ScopeMetrics)
+                    {
+                        if (sm.Metrics == null) continue;
+                        foreach (var m in sm.Metrics)
+                        {
+                            var metricName = m.Name;
+
+                            void AddPoints(Google.Protobuf.Collections.RepeatedField<OpenTelemetry.Proto.Metrics.V1.NumberDataPoint> pts)
+                            {
+                                if (pts == null) return;
+                                foreach (var pt in pts)
+                                {
+                                    var timestamp = DateTimeOffset.FromUnixTimeMilliseconds((long)(pt.TimeUnixNano / 1_000_000));
+                                    double val = pt.ValueCase switch
+                                    {
+                                        OpenTelemetry.Proto.Metrics.V1.NumberDataPoint.ValueOneofCase.AsDouble => pt.AsDouble,
+                                        OpenTelemetry.Proto.Metrics.V1.NumberDataPoint.ValueOneofCase.AsInt => pt.AsInt,
+                                        _ => 0
+                                    };
+                                    points.Add(new
+                                    {
+                                        metricName,
+                                        serviceName,
+                                        timestamp,
+                                        value = val
+                                    });
+                                }
+                            }
+
+                            if (m.Gauge != null) AddPoints(m.Gauge.DataPoints);
+                            if (m.Sum != null) AddPoints(m.Sum.DataPoints);
+                        }
+                    }
+                }
+            }
+            return Results.Json(points);
+        });
+
+        _app.MapPost("/api/logs/clear", (ITelemetryStore store) => { store.ClearLogs(); return Results.Ok(); });
+        _app.MapPost("/api/traces/clear", (ITelemetryStore store) => { store.ClearTraces(); return Results.Ok(); });
+        _app.MapPost("/api/metrics/clear", (ITelemetryStore store) => { store.ClearMetrics(); return Results.Ok(); });
 
         _app.MapGet("/debug-env", (IWebHostEnvironment env) => new
         {
@@ -236,10 +328,6 @@ public class GatewayAppPipeHost
             env.WebRootPath,
             env.EnvironmentName
         });
-
-        // Note: The namespace of Razor components is based on project root namespace and folder path.
-        _app.MapRazorComponents<AppPipe.Hosting.Components.App>()
-            .AddInteractiveServerRenderMode();
 
         // Map OTLP gRPC services
         _app.MapGrpcService<TraceReceiverService>();

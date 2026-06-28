@@ -1,0 +1,253 @@
+@page "/dashboard/logs"
+@{
+    ViewData["Title"] = "Console Logs";
+}
+
+<div class="filter-bar">
+    <div class="search-container">
+        <input type="text" class="aspire-input" placeholder="Search message, trace, attributes..." id="log-search" oninput="onLogSearchChange(this.value)">
+        <span class="search-shortcut">/</span>
+    </div>
+    <div class="pill-group" id="log-service-pills">
+        <!-- Dynamic Pills -->
+    </div>
+    <div class="pill-group">
+        <button class="pill-btn active" onclick="setLogLevelFilter('All', this)">All Levels</button>
+        <button class="pill-btn" onclick="setLogLevelFilter('Debug', this)">Debug</button>
+        <button class="pill-btn" onclick="setLogLevelFilter('Info', this)">Info</button>
+        <button class="pill-btn" onclick="setLogLevelFilter('Warning', this)">Warning</button>
+        <button class="pill-btn" onclick="setLogLevelFilter('Error', this)">Error</button>
+    </div>
+    <div class="pill-group">
+        <button class="pill-btn active" onclick="setLogTimeFilter('All', this)">All Time</button>
+        <button class="pill-btn" onclick="setLogTimeFilter('5m', this)">Last 5m</button>
+        <button class="pill-btn" onclick="setLogTimeFilter('15m', this)">Last 15m</button>
+        <button class="pill-btn" onclick="setLogTimeFilter('1h', this)">Last 1h</button>
+    </div>
+    <button class="aspire-btn" onclick="exportLogsCsv()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        <span>Export CSV</span>
+    </button>
+</div>
+
+<div class="aspire-table-container">
+    <table class="aspire-table">
+        <thead>
+            <tr>
+                <th style="width: 170px;">Timestamp</th>
+                <th style="width: 110px;">Severity</th>
+                <th style="width: 170px;">Service Name</th>
+                <th>Console Output Message</th>
+            </tr>
+        </thead>
+        <tbody id="logs-table-body">
+            <!-- Rendered Dynamically -->
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination-bar" style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem;">
+    <div class="pagination-info" id="logs-pagination-info" style="font-size:0.875rem; color:var(--text-muted); font-weight:500;">Showing 0 of 0 logs</div>
+    <div class="pagination-btns" style="display:flex; gap:0.5rem;">
+        <button class="aspire-btn" id="logs-prev-btn" onclick="paginateLogs(-1)">Prev</button>
+        <button class="aspire-btn" id="logs-next-btn" onclick="paginateLogs(1)">Next</button>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        state.activeTab = 'logs';
+        state.selectedService = localStorage.getItem('apppipe_logs_service') || 'All';
+        state.selectedLevel = localStorage.getItem('apppipe_logs_level') || 'All';
+        state.selectedTimeRange = localStorage.getItem('apppipe_logs_timerange') || 'All';
+        state.searchTerm = '';
+        state.logPage = 1;
+        state.logsPerPage = 50;
+
+        function onLogSearchChange(val) {
+            state.searchTerm = val;
+            state.logPage = 1;
+            renderActiveTab();
+        }
+
+        function setLogLevelFilter(lvl, btn) {
+            state.selectedLevel = lvl;
+            localStorage.setItem('apppipe_logs_level', lvl);
+            btn.parentNode.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.logPage = 1;
+            renderActiveTab();
+        }
+
+        function setLogTimeFilter(range, btn) {
+            state.selectedTimeRange = range;
+            localStorage.setItem('apppipe_logs_timerange', range);
+            btn.parentNode.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.logPage = 1;
+            renderActiveTab();
+        }
+
+        function setLogServiceFilter(srv, btn) {
+            state.selectedService = srv;
+            localStorage.setItem('apppipe_logs_service', srv);
+            btn.parentNode.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.logPage = 1;
+            renderActiveTab();
+        }
+
+        function filterLogByAttributeClick(val) {
+            document.getElementById('log-search').value = val;
+            onLogSearchChange(val);
+            showNotification(`Filtering logs by "${val}"`, 'info');
+        }
+
+        function paginateLogs(direction) {
+            state.logPage += direction;
+            renderActiveTab();
+        }
+
+        function renderActiveTab() {
+            // Render service pills dynamically
+            const servicePills = document.getElementById('log-service-pills');
+            const distinctServices = [...new Set(state.logs.map(l => l.serviceName))];
+            
+            let pillsHtml = `<button class="pill-btn ${state.selectedService === 'All' ? 'active' : ''}" onclick="setLogServiceFilter('All', this)">All Services</button>`;
+            distinctServices.forEach(srv => {
+                pillsHtml += `<button class="pill-btn ${state.selectedService === srv ? 'active' : ''}" onclick="setLogServiceFilter('${srv}', this)">${srv}</button>`;
+            });
+            servicePills.innerHTML = pillsHtml;
+
+            // Apply filters
+            const now = new Date();
+            let filtered = state.logs.filter(log => {
+                if (state.selectedService !== 'All' && log.serviceName !== state.selectedService) return false;
+                
+                if (state.selectedLevel !== 'All') {
+                    if (log.severity.toLowerCase() !== state.selectedLevel.toLowerCase()) return false;
+                }
+
+                if (state.selectedTimeRange !== 'All') {
+                    const logTime = new Date(log.timestamp);
+                    const diffMins = (now - logTime) / 60000;
+                    if (state.selectedTimeRange === '5m' && diffMins > 5) return false;
+                    if (state.selectedTimeRange === '15m' && diffMins > 15) return false;
+                    if (state.selectedTimeRange === '1h' && diffMins > 60) return false;
+                }
+
+                if (state.searchTerm) {
+                    const term = state.searchTerm.toLowerCase();
+                    const msgMatch = log.message && log.message.toLowerCase().includes(term);
+                    const srvMatch = log.serviceName && log.serviceName.toLowerCase().includes(term);
+                    const traceMatch = log.traceId && log.traceId.toLowerCase().includes(term);
+                    let attrMatch = false;
+                    if (log.attributes) {
+                        attrMatch = Object.entries(log.attributes).some(([k, v]) => 
+                            k.toLowerCase().includes(term) || v.toLowerCase().includes(term)
+                        );
+                    }
+                    return msgMatch || srvMatch || traceMatch || attrMatch;
+                }
+
+                return true;
+            });
+
+            // Sort logs descending
+            filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            const total = filtered.length;
+            const totalPages = Math.ceil(total / state.logsPerPage) || 1;
+            if (state.logPage > totalPages) state.logPage = totalPages;
+            
+            const startIdx = (state.logPage - 1) * state.logsPerPage;
+            const endIdx = Math.min(startIdx + state.logsPerPage, total);
+            const paginatedLogs = filtered.slice(startIdx, endIdx);
+
+            document.getElementById('logs-pagination-info').innerText = `Showing ${total === 0 ? 0 : startIdx + 1}-${endIdx} of ${total} logs`;
+            document.getElementById('logs-prev-btn').disabled = state.logPage <= 1;
+            document.getElementById('logs-next-btn').disabled = state.logPage >= totalPages;
+
+            const tbody = document.getElementById('logs-table-body');
+            if (paginatedLogs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state" style="border:none; text-align:center; padding:3rem;"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg><div class="empty-state-title" style="font-weight:700; margin-top:0.5rem;">No Logs Found</div><div style="color:var(--text-muted);">Try adjusting your filters or search terms.</div></td></tr>';
+                return;
+            }
+
+            let html = '';
+            paginatedLogs.forEach(log => {
+                const dateStr = new Date(log.timestamp).toLocaleString();
+                let sevBadge = 'badge-muted';
+                const sev = log.severity.toLowerCase();
+                if (sev.includes('info')) sevBadge = 'badge-info';
+                else if (sev.includes('warn') || sev.includes('warning')) sevBadge = 'badge-warn';
+                else if (sev.includes('error') || sev.includes('fatal') || sev.includes('crit')) sevBadge = 'badge-error';
+
+                let attributesHtml = '';
+                if (log.attributes && Object.keys(log.attributes).length > 0) {
+                    attributesHtml += `<details class="log-details"><summary>Log Attributes</summary><div class="details-grid">`;
+                    Object.entries(log.attributes).forEach(([k, v]) => {
+                        attributesHtml += `<div class="details-item"><span class="details-key">${escapeHtml(k)}</span><span class="details-val" onclick="filterLogByAttributeClick('${escapeHtml(v)}')">${escapeHtml(v)}</span></div>`;
+                    });
+                    attributesHtml += `</div></details>`;
+                }
+
+                // Updated trace link to point directly to traces page URL instead of tab switch
+                const tracesPageUrl = `${getBaseUrl()}/dashboard/traces`;
+                const traceLink = log.traceId ? `<a href="${tracesPageUrl}?search=${log.traceId}" title="Correlation Trace Graph" style="color:var(--accent); cursor:pointer; margin-left:0.5rem;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></a>` : '';
+
+                html += `
+                    <tr>
+                        <td class="mono" style="font-size:0.8rem; color:var(--text-muted);">${dateStr}</td>
+                        <td><span class="badge ${sevBadge}">${log.severity}</span></td>
+                        <td><span class="badge badge-muted text-truncate" title="${log.serviceName}">${log.serviceName}</span></td>
+                        <td>
+                            <div class="mono" style="word-break: break-all; white-space: pre-wrap; line-height: 1.4;">${escapeHtml(log.message)}${traceLink}</div>
+                            ${attributesHtml}
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function exportLogsCsv() {
+            const now = new Date();
+            let filtered = state.logs.filter(log => {
+                if (state.selectedService !== 'All' && log.serviceName !== state.selectedService) return false;
+                if (state.selectedLevel !== 'All' && log.severity.toLowerCase() !== state.selectedLevel.toLowerCase()) return false;
+                if (state.selectedTimeRange !== 'All') {
+                    const logTime = new Date(log.timestamp);
+                    if ((now - logTime) / 60000 > parseInt(state.selectedTimeRange)) return false;
+                }
+                return true;
+            });
+
+            filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            let csv = 'Timestamp,Severity,Service,Message\n';
+            filtered.forEach(l => {
+                const safeMsg = `"${l.message.replace(/"/g, '""')}"`;
+                csv += `${new Date(l.timestamp).toISOString()},${l.severity},${l.serviceName},${safeMsg}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `logs_export_${Date.now()}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showNotification('CSV exported successfully', 'success');
+        }
+
+        // Keyboard Shortcut setup
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '/' && document.activeElement && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                const search = document.getElementById('log-search');
+                if (search) search.focus();
+            }
+        });
+    </script>
+}

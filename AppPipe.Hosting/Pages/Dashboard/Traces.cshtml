@@ -1,0 +1,569 @@
+@page "/dashboard/traces"
+@{
+    ViewData["Title"] = "Distributed Traces";
+}
+
+@section Styles {
+    <style>
+        .trace-card {
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            background: var(--panel-bg);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            margin-bottom: 1.25rem;
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .trace-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        .trace-card.slow-trace-warn { border-left: 4px solid var(--badge-warn-text); }
+        .trace-card.slow-trace-error { border-left: 4px solid var(--badge-error-text); }
+
+        .trace-header {
+            padding: 1.15rem;
+            background: var(--table-header-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+        }
+
+        .trace-body {
+            display: none;
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--panel-solid);
+        }
+
+        .trace-card.expanded .trace-body {
+            display: block;
+        }
+
+        .waterfall-container {
+            margin-top: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            overflow: hidden;
+            background: var(--bg-color);
+            margin-bottom: 1.75rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .waterfall-header {
+            display: flex;
+            background: var(--table-header-bg);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.725rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            padding: 0.65rem 1.15rem;
+        }
+
+        .waterfall-col-name {
+            width: 40%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .waterfall-col-timeline {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding-left: 1rem;
+        }
+
+        .waterfall-row {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.85rem;
+            padding: 0.75rem 1.15rem;
+            align-items: center;
+        }
+        .waterfall-row:last-child { border-bottom: none; }
+        .waterfall-row:hover { background-color: var(--panel-bg-hover); }
+        .waterfall-row.selected-span { background-color: var(--accent-glow); }
+
+        .timeline-track {
+            position: absolute;
+            left: 1rem;
+            right: 1.15rem;
+            height: 2px;
+            background: var(--border-color);
+            opacity: 0.5;
+        }
+
+        .timeline-bar {
+            position: absolute;
+            height: 14px;
+            background: var(--accent);
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+            min-width: 5px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .timeline-bar:hover {
+            filter: brightness(1.15);
+            box-shadow: 0 0 10px var(--accent-solid-glow);
+            transform: scaleY(1.1);
+        }
+
+        .correlated-logs-title {
+            font-weight: 700;
+            font-size: 0.925rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.25rem;
+        }
+    </style>
+}
+
+<div class="filter-bar">
+    <div class="search-container">
+        <input type="text" class="aspire-input" placeholder="Search trace ID, span names, endpoint URLs..." id="trace-search" oninput="onTraceSearchChange(this.value)">
+    </div>
+    <div class="pill-group" id="trace-service-pills">
+        <!-- Dynamic Pills -->
+    </div>
+    <div class="pill-group">
+        <button class="pill-btn active" onclick="setTraceStatusFilter('All', this)">All Status</button>
+        <button class="pill-btn" onclick="setTraceStatusFilter('Success', this)">Success</button>
+        <button class="pill-btn" onclick="setTraceStatusFilter('Error', this)">Error</button>
+    </div>
+    <div class="pill-group">
+        <button class="pill-btn active" onclick="setTraceDurationFilter('All', this)">All Latency</button>
+        <button class="pill-btn" onclick="setTraceDurationFilter('200', this)">&gt; 200ms</button>
+        <button class="pill-btn" onclick="setTraceDurationFilter('500', this)">&gt; 500ms</button>
+        <button class="pill-btn" onclick="setTraceDurationFilter('1000', this)">&gt; 1000ms</button>
+    </div>
+</div>
+
+<div id="traces-list-container">
+    <!-- Rendered Dynamically -->
+</div>
+
+<div class="pagination-bar" style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem;">
+    <div class="pagination-info" id="traces-pagination-info" style="font-size:0.875rem; color:var(--text-muted); font-weight:500;">Showing 0 of 0 traces</div>
+    <div class="pagination-btns" style="display:flex; gap:0.5rem;">
+        <button class="aspire-btn" id="traces-prev-btn" onclick="paginateTraces(-1)">Prev</button>
+        <button class="aspire-btn" id="traces-next-btn" onclick="paginateTraces(1)">Next</button>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        state.activeTab = 'traces';
+        state.selectedTraceService = localStorage.getItem('apppipe_traces_service') || 'All';
+        state.traceStatusFilter = localStorage.getItem('apppipe_traces_status') || 'All';
+        state.traceDurationFilter = localStorage.getItem('apppipe_traces_slow') || 'All';
+        state.traceSearchTerm = '';
+        state.tracePage = 1;
+        state.tracesPerPage = 25;
+        state.expandedTraces = new Set();
+
+        // Check if there is an initial search query in the URL parameter (correlation redirect from logs)
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        if (searchParam) {
+            state.traceSearchTerm = searchParam;
+            state.expandedTraces.add(searchParam);
+            document.getElementById('trace-search').value = searchParam;
+        }
+
+        function onTraceSearchChange(val) {
+            state.traceSearchTerm = val;
+            state.tracePage = 1;
+            renderActiveTab();
+        }
+
+        function setTraceServiceFilter(srv, btn) {
+            state.selectedTraceService = srv;
+            localStorage.setItem('apppipe_traces_service', srv);
+            btn.parentNode.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.tracePage = 1;
+            renderActiveTab();
+        }
+
+        function setTraceStatusFilter(status, btn) {
+            state.traceStatusFilter = status;
+            localStorage.setItem('apppipe_traces_status', status);
+            btn.parentNode.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.tracePage = 1;
+            renderActiveTab();
+        }
+
+        function setTraceDurationFilter(dur, btn) {
+            state.traceDurationFilter = dur;
+            localStorage.setItem('apppipe_traces_slow', dur);
+            btn.parentNode.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.tracePage = 1;
+            renderActiveTab();
+        }
+
+        function paginateTraces(direction) {
+            state.tracePage += direction;
+            renderActiveTab();
+        }
+
+        function copyTraceId(traceId, event) {
+            event.stopPropagation();
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(traceId);
+                showNotification('Trace ID copied to clipboard', 'success');
+            }
+        }
+
+        function toggleTraceExpanded(traceId) {
+            if (state.expandedTraces.has(traceId)) {
+                state.expandedTraces.delete(traceId);
+            } else {
+                state.expandedTraces.add(traceId);
+            }
+            renderActiveTab();
+        }
+
+        function getServiceColor(serviceName) {
+            let hash = 0;
+            for (let i = 0; i < serviceName.length; i++) {
+                hash = serviceName.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const colors = [
+                '#0284c7', // Sky
+                '#10b981', // Emerald
+                '#f59e0b', // Amber
+                '#ef4444', // Red
+                '#8b5cf6', // Violet
+                '#ec4899', // Pink
+                '#14b8a6', // Teal
+                '#6366f1', // Indigo
+                '#f97316'  // Orange
+            ];
+            const idx = Math.abs(hash) % colors.length;
+            return colors[idx];
+        }
+
+        function parseDurationMs(durationVal) {
+            if (durationVal === null || durationVal === undefined) return 0;
+            if (typeof durationVal === 'number') return durationVal;
+            const durationStr = String(durationVal);
+            if (durationStr.includes(':')) {
+                const parts = durationStr.split(':');
+                const hrs = parseFloat(parts[0]) || 0;
+                const mins = parseFloat(parts[1]) || 0;
+                const secs = parseFloat(parts[2]) || 0;
+                return (hrs * 3600 + mins * 60 + secs) * 1000;
+            }
+            const parsed = parseFloat(durationStr);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+
+        function openSpanDetails(spanDataJson) {
+            const span = JSON.parse(decodeURIComponent(spanDataJson));
+            const drawer = document.getElementById('span-detail-drawer');
+            
+            document.getElementById('drawer-span-name').innerText = span.name;
+            
+            const color = getServiceColor(span.serviceName);
+            const statusClass = span.isError ? 'badge-error' : 'badge-success';
+            const statusText = span.isError ? 'Error / Failed' : 'Success';
+
+            let attributesHtml = '';
+            if (span.attributes) {
+                attributesHtml = `<div class="details-grid" style="grid-template-columns: 1fr; gap: 0.4rem; padding: 0;">`;
+                Object.entries(span.attributes).forEach(([k, v]) => {
+                    attributesHtml += `<div class="details-item"><span class="details-key">${escapeHtml(k)}</span><span class="mono" style="word-break:break-all; font-size:0.75rem;">${escapeHtml(v)}</span></div>`;
+                });
+                attributesHtml += `</div>`;
+            } else {
+                attributesHtml = '<div style="font-size:0.8rem; color:var(--text-muted);">No custom attributes on this span.</div>';
+            }
+
+            const bodyHtml = `
+                <div class="service-detail-row">
+                    <span class="details-key">Service Name:</span>
+                    <span class="badge" style="background-color:${color}15; color:${color}; font-weight:600;">${span.serviceName}</span>
+                </div>
+                <div class="service-detail-row">
+                    <span class="details-key">Status:</span>
+                    <span class="badge ${statusClass}">${statusText}</span>
+                </div>
+                <div class="service-detail-row">
+                    <span class="details-key">Duration:</span>
+                    <span class="mono" style="font-weight:700;">${parseDurationMs(span.duration).toFixed(1)} ms</span>
+                </div>
+                <div class="service-detail-row">
+                    <span class="details-key">Start Time:</span>
+                    <span class="mono">${new Date(span.startTime).toLocaleTimeString()}</span>
+                </div>
+                ${span.httpMethod ? `
+                <div class="service-detail-row">
+                    <span class="details-key">HTTP Request:</span>
+                    <span class="mono" style="font-weight:600; color:var(--accent);">${span.httpMethod}</span>
+                </div>
+                <div class="service-detail-row">
+                    <span class="details-key">Response Status:</span>
+                    <span class="badge ${span.httpStatusCode >= 400 ? 'badge-error' : 'badge-success'}">${span.httpStatusCode || 'N/A'}</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;">
+                    <span class="details-key">URL Path:</span>
+                    <span class="mono" style="word-break:break-all; background:var(--bg-color); padding:0.4rem; border-radius:6px; border:1px solid var(--border-color); font-size:0.75rem;">${span.urlPath}</span>
+                </div>
+                ` : ''}
+                
+                <div style="font-weight:600; font-size:0.9rem; margin-top:0.5rem; border-bottom:1px solid var(--border-color); padding-bottom:0.25rem;">Attributes</div>
+                ${attributesHtml}
+            `;
+
+            document.getElementById('drawer-span-body').innerHTML = bodyHtml;
+            drawer.classList.add('open');
+
+            document.querySelectorAll('.waterfall-row').forEach(row => row.classList.remove('selected-span'));
+            const targetRow = document.getElementById(`span-row-${span.spanId}`);
+            if (targetRow) targetRow.classList.add('selected-span');
+        }
+
+        function renderActiveTab() {
+            const servicePills = document.getElementById('trace-service-pills');
+            const allSpans = Object.values(state.traces).flatMap(t => t.allSpans || []);
+            const distinctServices = [...new Set(allSpans.map(s => s.serviceName))];
+            
+            let pillsHtml = `<button class="pill-btn ${state.selectedTraceService === 'All' ? 'active' : ''}" onclick="setTraceServiceFilter('All', this)">All Services</button>`;
+            distinctServices.forEach(srv => {
+                pillsHtml += `<button class="pill-btn ${state.selectedTraceService === srv ? 'active' : ''}" onclick="setTraceServiceFilter('${srv}', this)">${srv}</button>`;
+            });
+            servicePills.innerHTML = pillsHtml;
+
+            // Apply filters
+            let filtered = Object.values(state.traces).filter(trace => {
+                if (state.selectedTraceService !== 'All') {
+                    const hasService = trace.allSpans && trace.allSpans.some(s => s.serviceName === state.selectedTraceService);
+                    if (!hasService) return false;
+                }
+
+                if (state.traceStatusFilter !== 'All') {
+                    const isError = trace.hasError;
+                    if (state.traceStatusFilter === 'Error' && !isError) return false;
+                    if (state.traceStatusFilter === 'Success' && isError) return false;
+                }
+
+                if (state.traceDurationFilter !== 'All') {
+                    const thresholdMs = parseInt(state.traceDurationFilter);
+                    const durMs = trace.totalDuration ? parseDurationMs(trace.totalDuration) : 0;
+                    if (durMs < thresholdMs) return false;
+                }
+
+                if (state.traceSearchTerm) {
+                    const term = state.traceSearchTerm.toLowerCase();
+                    const traceMatch = trace.traceId && trace.traceId.toLowerCase().includes(term);
+                    const rootMatch = trace.rootSpan && trace.rootSpan.name.toLowerCase().includes(term);
+                    const spansMatch = trace.allSpans && trace.allSpans.some(s => 
+                        s.name.toLowerCase().includes(term) || 
+                        s.serviceName.toLowerCase().includes(term) ||
+                        (s.urlPath && s.urlPath.toLowerCase().includes(term))
+                    );
+                    return traceMatch || rootMatch || spansMatch;
+                }
+
+                return true;
+            });
+
+            filtered.sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+
+            const total = filtered.length;
+            const totalPages = Math.ceil(total / state.tracesPerPage) || 1;
+            if (state.tracePage > totalPages) state.tracePage = totalPages;
+            
+            const startIdx = (state.tracePage - 1) * state.tracesPerPage;
+            const endIdx = Math.min(startIdx + state.tracesPerPage, total);
+            const paginated = filtered.slice(startIdx, endIdx);
+
+            document.getElementById('traces-pagination-info').innerText = `Showing ${total === 0 ? 0 : startIdx + 1}-${endIdx} of ${total} traces`;
+            document.getElementById('traces-prev-btn').disabled = state.tracePage <= 1;
+            document.getElementById('traces-next-btn').disabled = state.tracePage >= totalPages;
+
+            const container = document.getElementById('traces-list-container');
+            if (paginated.length === 0) {
+                container.innerHTML = '<div class="empty-state" style="text-align:center; padding:3rem;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><div class="empty-state-title" style="font-weight:700; margin-top:0.5rem;">No Traces Found</div><div style="color:var(--text-muted);">Try clearing filters or search tags.</div></div>';
+                return;
+            }
+
+            let html = '';
+            paginated.forEach(trace => {
+                const durMs = parseDurationMs(trace.totalDuration);
+                let warningBadge = '';
+                let borderClass = '';
+                if (durMs >= 1000) {
+                    warningBadge = '<span class="badge badge-error">⚠️ Slow (&gt;1000ms)</span>';
+                    borderClass = 'slow-trace-error';
+                } else if (durMs >= 500) {
+                    warningBadge = '<span class="badge badge-warn">⚠️ Slow (&gt;500ms)</span>';
+                    borderClass = 'slow-trace-warn';
+                }
+
+                const dateStr = new Date(trace.startTime).toLocaleString();
+                const isExpanded = state.expandedTraces.has(trace.traceId);
+                const rootName = trace.rootSpan ? trace.rootSpan.name : (trace.allSpans && trace.allSpans.length > 0 ? trace.allSpans[0].name : 'Unknown Trace');
+                const rootService = trace.rootSpan ? trace.rootSpan.serviceName : (trace.allSpans && trace.allSpans.length > 0 ? trace.allSpans[0].serviceName : 'Unknown Service');
+                const statusBadge = trace.hasError ? '<span class="badge badge-error">Error</span>' : '<span class="badge badge-success">Success</span>';
+
+                let waterfallHtml = '';
+                let correlatedLogsHtml = '';
+
+                if (isExpanded) {
+                    waterfallHtml = renderWaterfallSpans(trace);
+                    correlatedLogsHtml = renderCorrelatedLogs(trace.traceId);
+                }
+
+                html += `
+                    <div class="trace-card ${borderClass} ${isExpanded ? 'expanded' : ''}">
+                        <div class="trace-header" onclick="toggleTraceExpanded('${trace.traceId}')">
+                            <div class="trace-title-group" style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                                <span class="mono" style="font-weight:700; color:var(--text-main); font-size:0.9rem;">${trace.traceId.substring(0,8)}...</span>
+                                <button class="aspire-btn" style="padding:0.15rem 0.4rem; font-size:0.7rem;" onclick="copyTraceId('${trace.traceId}', event)">Copy</button>
+                                <span class="badge badge-muted font-weight-600">${rootService}</span>
+                                <span class="mono" style="font-weight:600; color:var(--text-main);">${escapeHtml(rootName)}</span>
+                            </div>
+                            <div class="trace-meta" style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; font-size:0.85rem; color:var(--text-muted);">
+                                <span class="mono" style="font-weight:700; color:var(--text-main);">${durMs.toFixed(1)} ms</span>
+                                ${statusBadge}
+                                ${warningBadge}
+                                <span>${dateStr}</span>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform: ${isExpanded ? 'rotate(180deg)' : 'rotate(0)'}; transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </div>
+                        </div>
+                        <div class="trace-body">
+                            <div class="waterfall-container">
+                                <div class="waterfall-header">
+                                    <div class="waterfall-col-name">Span Tree & Service</div>
+                                    <div class="waterfall-col-timeline">Timeline (Total: ${durMs.toFixed(1)}ms) - Click span name for properties drawer</div>
+                                </div>
+                                ${waterfallHtml}
+                            </div>
+                            <div class="correlated-logs-title">Correlated Trace Logs</div>
+                            ${correlatedLogsHtml}
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderWaterfallSpans(trace) {
+            const spans = [...trace.allSpans];
+            spans.sort((a,b) => new Date(a.startTime) - new Date(b.startTime));
+
+            const spanIds = new Set(spans.map(s => s.spanId));
+            const rootSpans = spans.filter(s => !s.parentSpanId || !spanIds.has(s.parentSpanId));
+
+            const buildTree = (parentSpan) => {
+                parentSpan.children = spans.filter(s => s.parentSpanId === parentSpan.spanId);
+                parentSpan.children.forEach(buildTree);
+            };
+            rootSpans.forEach(buildTree);
+
+            const traceStart = new Date(trace.startTime).getTime();
+            const traceDuration = parseDurationMs(trace.totalDuration) || 1;
+
+            let html = '';
+            
+            const renderNode = (span, depth = 0) => {
+                const spanStart = new Date(span.startTime).getTime();
+                const spanDur = parseDurationMs(span.duration);
+                
+                const startOffsetMs = spanStart - traceStart;
+                let startPct = (startOffsetMs / traceDuration) * 100;
+                let widthPct = (spanDur / traceDuration) * 100;
+
+                if (startPct < 0) startPct = 0;
+                if (widthPct < 0) widthPct = 0.5;
+                if (startPct + widthPct > 100) widthPct = 100 - startPct;
+
+                const color = getServiceColor(span.serviceName);
+                const indent = depth * 16;
+
+                const isSpanError = span.isError ? '<span class="badge badge-error" style="padding:0.05rem 0.2rem; font-size:0.6rem; margin-left:0.25rem;">Error</span>' : '';
+                const codeBadge = span.httpStatusCode ? `<span class="badge ${span.httpStatusCode >= 400 ? 'badge-error' : 'badge-success'}" style="padding:0.05rem 0.2rem; font-size:0.6rem; margin-left:0.25rem;">HTTP ${span.httpStatusCode}</span>` : '';
+
+                const spanDataJson = encodeURIComponent(JSON.stringify(span));
+
+                html += `
+                    <div class="waterfall-row" id="span-row-${span.spanId}">
+                        <div class="waterfall-col-name span-name-cell" style="padding-left: calc(1rem + ${indent}px)">
+                            <span class="badge" style="background-color: ${color}15; color: ${color}; border: 1px solid ${color}40; padding:0.15rem 0.4rem; font-size:0.7rem; font-weight:600; margin-right:0.4rem;">${span.serviceName}</span>
+                            <span class="mono" style="font-weight:600; color:var(--text-main); font-size:0.8rem; cursor:pointer;" onclick="openSpanDetails('${spanDataJson}')" title="Click for details">${escapeHtml(span.name)}</span>
+                            ${isSpanError}
+                            ${codeBadge}
+                        </div>
+                        <div class="waterfall-col-timeline span-timeline-cell">
+                            <div class="timeline-track"></div>
+                            <div class="timeline-bar" onclick="openSpanDetails('${spanDataJson}')" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color};"></div>
+                        </div>
+                    </div>
+                `;
+
+                if (span.children) {
+                    span.children.forEach(c => renderNode(c, depth + 1));
+                }
+            };
+
+            rootSpans.forEach(r => renderNode(r, 0));
+            return html;
+        }
+
+        function renderCorrelatedLogs(traceId) {
+            const logs = state.logs.filter(l => l.traceId === traceId);
+            if (logs.length === 0) {
+                return '<div class="mono" style="font-size:0.8rem; color:var(--text-muted); padding: 0.5rem 0;">No logs correlated to this trace.</div>';
+            }
+
+            logs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            let html = `
+                <div class="aspire-table-container" style="margin-bottom: 0;">
+                    <table class="aspire-table" style="font-size:0.8rem;">
+                        <thead>
+                            <tr>
+                                <th style="width:140px;">Timestamp</th>
+                                <th style="width:85px;">Severity</th>
+                                <th>Console Output Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            logs.forEach(log => {
+                let sevBadge = 'badge-muted';
+                const sev = log.severity.toLowerCase();
+                if (sev.includes('info')) sevBadge = 'badge-info';
+                else if (sev.includes('warn')) sevBadge = 'badge-warn';
+                else if (sev.includes('error')) sevBadge = 'badge-error';
+
+                html += `
+                    <tr>
+                        <td class="mono" style="color:var(--text-muted);">${new Date(log.timestamp).toLocaleTimeString()}</td>
+                        <td><span class="badge ${sevBadge}" style="padding:0.1rem 0.3rem; font-size:0.65rem;">${log.severity}</span></td>
+                        <td class="mono" style="word-break:break-all; white-space:pre-wrap; line-height:1.4;">${escapeHtml(log.message)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table></div>`;
+            return html;
+        }
+    </script>
+}

@@ -1,0 +1,195 @@
+@page "/dashboard"
+@{
+    ViewData["Title"] = "Command Center";
+}
+
+<div class="summary-dashboard-grid">
+    <div class="summary-card">
+        <div class="summary-icon" style="background-color: rgba(56, 189, 248, 0.1); color: var(--accent);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+        </div>
+        <div class="summary-info">
+            <span class="summary-label">Total Services</span>
+            <span class="summary-value" id="summary-services-count">0</span>
+        </div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-icon" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
+        <div class="summary-info">
+            <span class="summary-label">Logs Emitted</span>
+            <span class="summary-value" id="summary-logs-count">0</span>
+        </div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-icon" style="background-color: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        </div>
+        <div class="summary-info">
+            <span class="summary-label">Traces Captured</span>
+            <span class="summary-value" id="summary-traces-count">0</span>
+        </div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-icon" style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        </div>
+        <div class="summary-info">
+            <span class="summary-label">Trace Error Rate</span>
+            <span class="summary-value" id="summary-error-rate">0%</span>
+        </div>
+    </div>
+</div>
+
+<div class="services-grid" id="services-list-container">
+    <!-- Rendered Dynamically -->
+</div>
+
+@section Scripts {
+    <script>
+        state.activeTab = 'services';
+
+        function updateOverviewStats() {
+            document.getElementById('summary-services-count').innerText = state.services.length;
+            document.getElementById('summary-logs-count').innerText = state.logs.length;
+            
+            const traceList = Object.values(state.traces);
+            document.getElementById('summary-traces-count').innerText = traceList.length;
+
+            const errorTraces = traceList.filter(t => t.hasError).length;
+            const rate = traceList.length > 0 ? (errorTraces / traceList.length) * 100 : 0;
+            document.getElementById('summary-error-rate').innerText = `${rate.toFixed(1)}%`;
+        }
+
+        function renderActiveTab() {
+            const container = document.getElementById('services-list-container');
+            if (state.services.length === 0) {
+                container.innerHTML = '<div class="empty-state" style="grid-column: 1/-1;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg><div class="empty-state-title">No Services Running</div><div>Start your AppHost orchestrator to display running services.</div></div>';
+                return;
+            }
+
+            let html = '';
+            state.services.forEach(srv => {
+                const isHost = srv.type === 'HostProject';
+                const badgeClass = isHost ? 'badge-success' : 'badge-info';
+                
+                const srvLogs = state.logs.filter(l => l.serviceName === srv.name);
+                const errorsCount = srvLogs.filter(l => l.severity.toLowerCase().includes('err') || l.severity.toLowerCase().includes('fatal')).length;
+                const errorPill = errorsCount > 0 ? `<span class="badge badge-error" style="font-size:0.65rem;">${errorsCount} Errors</span>` : '<span class="badge badge-success" style="font-size:0.65rem;">Healthy</span>';
+
+                const referencesPills = srv.references && srv.references.length > 0 
+                    ? srv.references.map(r => `<span class="badge badge-info" style="font-size:0.65rem; margin-right:0.25rem;">${r}</span>`).join('')
+                    : '<span style="color:var(--text-muted); font-size:0.75rem;">None</span>';
+
+                const waitPills = srv.waitDependencies && srv.waitDependencies.length > 0 
+                    ? srv.waitDependencies.map(w => `<span class="badge badge-warn" style="font-size:0.65rem; margin-right:0.25rem;">${w}</span>`).join('')
+                    : '<span style="color:var(--text-muted); font-size:0.75rem;">None</span>';
+
+                let envVarsTableHtml = '<span style="color:var(--text-muted); font-size:0.75rem;">None configured.</span>';
+                if (srv.envVars && Object.keys(srv.envVars).length > 0) {
+                    envVarsTableHtml = `
+                        <table class="aspire-table" style="font-size:0.75rem; margin-top:0.35rem;">
+                            <thead>
+                                <tr><th>Key</th><th>Value</th></tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    Object.entries(srv.envVars).forEach(([k, v]) => {
+                        envVarsTableHtml += `<tr><td class="mono" style="font-weight:600; padding:0.4rem;">${escapeHtml(k)}</td><td class="mono" style="word-break:break-all; padding:0.4rem;">${escapeHtml(v)}</td></tr>`;
+                    });
+                    envVarsTableHtml += '</tbody></table>';
+                }
+
+                html += `
+                    <div class="service-card">
+                        <div class="service-card-header">
+                            <span class="service-card-title">${srv.name}</span>
+                            <div style="display:flex; gap:0.4rem;">
+                                ${errorPill}
+                                <span class="badge ${badgeClass}">${srv.type}</span>
+                            </div>
+                        </div>
+                        <div class="service-card-details">
+                            <div class="service-detail-row">
+                                <span class="details-key">Port/Endpoints:</span>
+                                <span class="mono">${srv.port ? `<a href="http://localhost:${srv.port}" target="_blank" style="color:var(--accent); font-weight:600;">http://localhost:${srv.port}</a>` : 'N/A'}</span>
+                            </div>
+                            ${srv.appPath ? `
+                            <div class="service-detail-row">
+                                <span class="details-key">App Path:</span>
+                                <span class="mono" style="font-weight:600;">${srv.appPath}</span>
+                            </div>` : ''}
+                            ${srv.siteName ? `
+                            <div class="service-detail-row">
+                                <span class="details-key">IIS Site:</span>
+                                <span>${srv.siteName}</span>
+                            </div>` : ''}
+                            ${srv.poolName ? `
+                            <div class="service-detail-row">
+                                <span class="details-key">App Pool:</span>
+                                <span>${srv.poolName}</span>
+                            </div>` : ''}
+                        </div>
+
+                        <details class="service-subdetails-accordion">
+                            <summary>More Info & Config</summary>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem; padding-top:0.5rem;">
+                                <div>
+                                    <div class="details-key" style="font-size:0.75rem; margin-bottom:0.15rem;">References:</div>
+                                    <div>${referencesPills}</div>
+                                </div>
+                                <div>
+                                    <div class="details-key" style="font-size:0.75rem; margin-bottom:0.15rem;">Wait Dependencies:</div>
+                                    <div>${waitPills}</div>
+                                </div>
+                                
+                                ${srv.projectPath ? `
+                                <div>
+                                    <div class="details-key" style="font-size:0.75rem; margin-bottom:0.15rem;">Project Path:</div>
+                                    <div class="mono" style="font-size:0.7rem; word-break:break-all;">${srv.projectPath}</div>
+                                </div>` : ''}
+
+                                ${srv.command ? `
+                                <div>
+                                    <div class="details-key" style="font-size:0.75rem; margin-bottom:0.15rem;">Command:</div>
+                                    <div class="mono" style="font-size:0.7rem; word-break:break-all;">${srv.command}</div>
+                                </div>` : ''}
+                                
+                                ${srv.workingDirectory ? `
+                                <div>
+                                    <div class="details-key" style="font-size:0.75rem; margin-bottom:0.15rem;">Working Directory:</div>
+                                    <div class="mono" style="font-size:0.7rem; word-break:break-all;">${srv.workingDirectory}</div>
+                                </div>` : ''}
+
+                                ${srv.args && srv.args.length > 0 ? `
+                                <div>
+                                    <div class="details-key" style="font-size:0.75rem; margin-bottom:0.15rem;">Arguments:</div>
+                                    <div class="mono" style="font-size:0.7rem; word-break:break-all;">${srv.args.join(' ')}</div>
+                                </div>` : ''}
+
+                                ${srv.displayName ? `
+                                <div>
+                                    <div class="details-key" style="font-size:0.75rem; margin-bottom:0.15rem;">Display Name:</div>
+                                    <div style="font-size:0.75rem;">${srv.displayName}</div>
+                                </div>` : ''}
+
+                                ${srv.hostingModel ? `
+                                <div class="service-detail-row" style="margin: 0;">
+                                    <span class="details-key" style="font-size:0.75rem;">Hosting Model:</span>
+                                    <span style="font-size:0.75rem;">${srv.hostingModel}</span>
+                                </div>` : ''}
+
+                                <details class="service-subdetails-accordion" style="margin-top: 0.25rem;">
+                                    <summary>Environment Variables (${srv.envVars ? Object.keys(srv.envVars).length : 0})</summary>
+                                    ${envVarsTableHtml}
+                                </details>
+                            </div>
+                        </details>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+    </script>
+}

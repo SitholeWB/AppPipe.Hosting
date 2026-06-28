@@ -14,16 +14,14 @@ With AppPipe, you get a beautiful, unified developer dashboard, OpenTelemetry (O
 
 ## 🌟 Features
 
-- **📊 OpenTelemetry Collector & Dashboard**: Collects OTLP traces, logs, and metrics. Displays them in a gorgeous Blazor dashboard (complete with Light/Dark modes, trace waterfall flamegraphs, structured console logs, and metric charts).
+- **📊 OpenTelemetry Collector & Dashboard**: Collects OTLP traces, logs, and metrics. Displays them in a gorgeous HTML5/Razor Pages dashboard (complete with Light/Dark modes, trace waterfall flamegraphs, structured console logs, and metric charts).
 - **💾 Extensible Database Persistence**: Transitive out-of-the-box telemetry storage via a local SQLite database, with full support for enterprise backends like **PostgreSQL, ClickHouse, SQL Server, MySQL, or Elasticsearch**, as well as a lightweight circular **in-memory** buffer.
 - **🔒 Dashboard Security**: Opt-in basic authentication protection for all dashboard and diagnostics routes.
 - **📈 Gateway Diagnostics Panel**: A dedicated diagnostics page showing real-time telemetry ingestion rates, active proxy connections, database sizes, and host system information.
 - **🔄 Unified Gateway & Routing**: Powered by **YARP (Yet Another Reverse Proxy)**, AppPipe hosts a central routing gateway that automatically maps and proxies requests to your backend microservices.
 - **🔌 Dynamic Port Allocation**: Automatically assigns free ports to your applications during local runs or deployment pipelines, preventing port conflict issues.
 - **🏢 Multi-Platform Deployment Engines**: Standard built-in modules powered by `ModularPipelines` to automate publishing, creating Windows AppPools, registering IIS sub-applications, setting up Linux `systemd` units, and generating Nginx/Caddy configurations.
-- **⚡ Dual Render Modes (Resource-Optimized)**:
-  - **Interactive (WebSocket-based)**: Real-time, live-updating metrics and traces.
-  - **SSR (Server-Side Rendered)**: WebSockets are disabled to minimize CPU and memory footprint, utilizing native forms and base-relative HTML pages. Perfect for VM-based production nodes or restricted host environments.
+- **⚡ Auto-Refresh Controls**: Fully control dashboard background polling using the integrated Auto-Refresh toggle (with configurable timing) to prevent unnecessary CPU/network overhead.
 
 ---
 
@@ -58,7 +56,7 @@ graph LR
         Gateway[YARP Gateway Proxy]:::gateway
         TelemetryPort[Telemetry gRPC Port]:::telemetry
         Store[(In-Memory Store)]:::store
-        Dashboard[Blazor Dashboard UI]:::dashboard
+        Dashboard[Dashboard UI]:::dashboard
         
         TelemetryPort -->|Write| Store
         Store -->|Read| Dashboard
@@ -390,7 +388,7 @@ This section guides developers on how to work inside the AppPipe.Hosting reposit
 - **PowerShell 7** (recommended for package automation)
 
 ### 2. Repository Layout
-- **`AppPipe.Hosting/`**: Core library (Blazor server-side pages, YARP configuration, OTLP listener, SQLite store, process manager).
+- **`AppPipe.Hosting/`**: Core library (Razor Pages pages, YARP configuration, OTLP listener, SQLite store, process manager).
 - **`templates/AppPipeSystemTemplate/`**: Scaffolding source code packaged as `.NET templates`.
 - **`samples/`**: Test projects (`AppPipe.DevHost`, `BackendWorker`, `FrontendApi`) used to test the gateway runner and telemetry collection.
 - **`tests/`**: Unit and integration test suites.

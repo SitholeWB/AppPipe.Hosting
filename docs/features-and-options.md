@@ -18,7 +18,7 @@ graph TD
     subgraph AppPipe.Hosting Core
         YarpProxy -->|Route matches /service/*| ChildApp[Microservice Process]
         OTLP[OTLP Telemetry Collector] -->|Parses Logs, Traces, Metrics| TelemetryStore[(InMemoryTelemetryStore)]
-        TelemetryStore --> Dashboard[Blazor Dashboard UI]
+        TelemetryStore --> Dashboard[Dashboard UI]
     end
     
     ChildApp -->|Exports Logs/Traces/Metrics| OTLP
@@ -97,14 +97,12 @@ By default, telemetry is stored in a local SQLite database (`SqliteTelemetryStor
 * **In-Memory Fallback**: SQLite database persistence can be disabled entirely (e.g. for developer builds or ephemeral staging VMs), letting AppPipe fallback to a lightweight circular in-memory buffer (`InMemoryTelemetryStore`) retaining a max cache of 500 items.
 * **Bounded Data Pruning**: SQLite and database providers are automatically configured to prune old records, keeping a maximum log, trace, and metric batch limit (defaulting to 500) to keep memory/disk footprints low.
 
-### 4. Blazor Dashboard UI
+### 4. HTML5 & Razor Pages Dashboard UI
 A visual dashboard that allows real-time diagnostics:
 * **Waterfalls**: Flamegraphs showing tracing cascades across services.
 * **Console Viewer**: Live, searchable stream of logs.
 * **Metric Graphs**: Visual charts plotting memory, CPU, and custom metrics.
-* **Render Modes**:
-  * **InteractiveServer**: Uses WebSockets to stream telemetry updates in real-time.
-  * **Static SSR**: Disables WebSockets, rendering pure base-relative HTML pages. Essential for resource-constrained production VMs and smooth operations behind IIS reverse proxies.
+* **Auto-Refresh controls**: Integrated toggle in the header bar allowing background polling to be easily enabled or paused, operating with a default 10-second frequency to conserve system resources. Works flawlessly under IIS reverse proxies and sub-applications.
 
 ---
 
@@ -668,7 +666,7 @@ This section guides developers on how to work inside the AppPipe.Hosting reposit
 - **PowerShell 7** (recommended for package automation)
 
 ### 2. Repository Layout
-- **`AppPipe.Hosting/`**: Core library (Blazor server-side pages, YARP configuration, OTLP listener, SQLite store, process manager).
+- **`AppPipe.Hosting/`**: Core library (Razor Pages pages, YARP configuration, OTLP listener, SQLite store, process manager).
 - **`templates/AppPipeSystemTemplate/`**: Scaffolding source code packaged as `.NET templates`.
 - **`samples/`**: Test projects (`AppPipe.DevHost`, `BackendWorker`, `FrontendApi`) used to test the gateway runner and telemetry collection.
 - **`tests/`**: Unit and integration test suites.

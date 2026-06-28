@@ -1,0 +1,1048 @@
+@{
+    var path = Context.Request.Path.Value?.ToLower() ?? "";
+}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AppPipe.NET Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --panel-bg: rgba(255, 255, 255, 0.85);
+            --panel-solid: #ffffff;
+            --panel-bg-hover: #f1f5f9;
+            --item-bg: #ffffff;
+            --accent: #0284c7;
+            --accent-hover: #0369a1;
+            --accent-glow: rgba(2, 132, 199, 0.15);
+            --accent-solid-glow: rgba(2, 132, 199, 0.4);
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: rgba(226, 232, 240, 0.8);
+            --border-hover: #cbd5e1;
+            --table-header-bg: #f8fafc;
+            --table-border: #f1f5f9;
+            --badge-success-bg: #dcfce7;
+            --badge-success-text: #166534;
+            --badge-success-glow: rgba(22, 101, 52, 0.15);
+            --badge-error-bg: #fee2e2;
+            --badge-error-text: #991b1b;
+            --badge-error-glow: rgba(153, 27, 27, 0.15);
+            --badge-info-bg: #e0f2fe;
+            --badge-info-text: #0369a1;
+            --badge-info-glow: rgba(3, 105, 161, 0.15);
+            --badge-warn-bg: #fef3c7;
+            --badge-warn-text: #92400e;
+            --badge-warn-glow: rgba(146, 64, 14, 0.15);
+            --sidebar-width: 260px;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+            --backdrop-filter: blur(12px);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0b0f19;
+            --panel-bg: rgba(17, 24, 39, 0.85);
+            --panel-solid: #111827;
+            --panel-bg-hover: #1f2937;
+            --item-bg: #1f2937;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --accent-glow: rgba(56, 189, 248, 0.12);
+            --accent-solid-glow: rgba(56, 189, 248, 0.35);
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --border-color: rgba(55, 65, 81, 0.6);
+            --border-hover: #4b5563;
+            --table-header-bg: #1f2937;
+            --table-border: #1f2937;
+            --badge-success-bg: rgba(22, 101, 52, 0.2);
+            --badge-success-text: #4ade80;
+            --badge-success-glow: rgba(74, 222, 128, 0.2);
+            --badge-error-bg: rgba(153, 27, 27, 0.25);
+            --badge-error-text: #f87171;
+            --badge-error-glow: rgba(248, 113, 113, 0.25);
+            --badge-info-bg: rgba(3, 105, 161, 0.25);
+            --badge-info-text: #38bdf8;
+            --badge-info-glow: rgba(56, 189, 248, 0.25);
+            --badge-warn-bg: rgba(146, 64, 14, 0.25);
+            --badge-warn-text: #fbbf24;
+            --badge-warn-glow: rgba(251, 191, 36, 0.2);
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-hover);
+        }
+
+        /* Sidebar Glassmorphism */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--panel-bg);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        .sidebar-brand {
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .brand-icon {
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            filter: drop-shadow(0 0 10px var(--accent-glow));
+            animation: pulse-glow 3s infinite ease-in-out;
+        }
+
+        @@keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 8px var(--accent-glow)); }
+            50% { filter: drop-shadow(0 0 16px var(--accent-solid-glow)); }
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 1.5rem 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            padding: 0.7rem 0.95rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 0.925rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .nav-item:hover {
+            background-color: var(--panel-bg-hover);
+            color: var(--text-main);
+            transform: translateX(4px);
+        }
+
+        .nav-item.active {
+            background-color: var(--accent-glow);
+            color: var(--accent);
+            font-weight: 600;
+            box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.15);
+        }
+        
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 25%;
+            bottom: 25%;
+            width: 4px;
+            background-color: var(--accent);
+            border-radius: 0 4px 4px 0;
+        }
+
+        .sidebar-footer {
+            padding: 1.25rem 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.65rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-align: left;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background-color: var(--panel-bg-hover);
+            color: var(--text-main);
+        }
+
+        /* Top Header Glassmorphism */
+        .main-wrapper {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .top-header {
+            height: 64px;
+            background-color: var(--panel-bg);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2.25rem;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .header-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+        @@keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .buffer-indicator {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.65rem;
+            border-radius: 20px;
+            background-color: var(--panel-bg-hover);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        /* Buttons */
+        .aspire-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.45rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--panel-solid);
+            color: var(--text-main);
+            cursor: pointer;
+            font-family: inherit;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .aspire-btn:hover {
+            background-color: var(--panel-bg-hover);
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+        
+        .aspire-btn:active {
+            transform: translateY(0);
+        }
+
+        .aspire-btn-primary {
+            background-color: var(--accent);
+            border-color: var(--accent);
+            color: #ffffff;
+        }
+        .aspire-btn-primary:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+            box-shadow: 0 0 12px var(--accent-solid-glow);
+        }
+
+        .main-content {
+            padding: 2.25rem;
+            flex: 1;
+        }
+
+        /* sliding detail panel for trace spans */
+        .sliding-panel {
+            position: fixed;
+            right: -450px;
+            width: 450px;
+            top: 0;
+            bottom: 0;
+            background: var(--panel-solid);
+            border-left: 1px solid var(--border-color);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.15);
+            z-index: 1000;
+            transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: var(--backdrop-filter);
+        }
+        .sliding-panel.open {
+            right: 0;
+        }
+
+        .panel-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        /* Glassmorphism Table Container */
+        .aspire-table-container {
+            background: var(--panel-bg);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 1.5rem;
+        }
+
+        .aspire-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            text-align: left;
+        }
+
+        .aspire-table th {
+            background: var(--table-header-bg);
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 0.95rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.775rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .aspire-table td {
+            padding: 1.15rem 1.5rem;
+            border-bottom: 1px solid var(--table-border);
+            color: var(--text-main);
+            vertical-align: top;
+            transition: background-color 0.15s;
+        }
+
+        .aspire-table tbody tr:hover td {
+            background-color: var(--panel-bg-hover);
+        }
+
+        .aspire-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Severity Glow Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.65rem;
+            font-size: 0.725rem;
+            font-weight: 700;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .badge-success { 
+            background-color: var(--badge-success-bg); 
+            color: var(--badge-success-text); 
+            box-shadow: 0 0 8px var(--badge-success-glow); 
+        }
+        .badge-error { 
+            background-color: var(--badge-error-bg); 
+            color: var(--badge-error-text); 
+            box-shadow: 0 0 10px var(--badge-error-glow);
+            animation: pulse-border 2s infinite ease-in-out; 
+        }
+        .badge-info { 
+            background-color: var(--badge-info-bg); 
+            color: var(--badge-info-text); 
+            box-shadow: 0 0 8px var(--badge-info-glow); 
+        }
+        .badge-warn { 
+            background-color: var(--badge-warn-bg); 
+            color: var(--badge-warn-text); 
+            box-shadow: 0 0 8px var(--badge-warn-glow); 
+        }
+        .badge-muted { 
+            background-color: var(--panel-bg-hover); 
+            color: var(--text-muted); 
+            border: 1px solid var(--border-color); 
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.825rem;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 9999;
+        }
+
+        .toast {
+            min-width: 250px;
+            background: var(--panel-solid);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent);
+            box-shadow: var(--shadow-lg);
+            border-radius: 8px;
+            padding: 0.85rem 1.25rem;
+            color: var(--text-main);
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideInToast 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        @@keyframes slideInToast {
+            from { transform: translateY(20px) scale(0.95); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        .toast-success { border-left-color: #10b981; }
+        .toast-error { border-left-color: #ef4444; }
+
+        /* Filters & Inputs styling */
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.85rem;
+            margin-bottom: 1.75rem;
+            background: var(--panel-bg);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            padding: 1.15rem;
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .search-container {
+            flex: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .aspire-input {
+            width: 100%;
+            padding: 0.55rem 1rem;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+        .aspire-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+            background-color: var(--panel-solid);
+        }
+
+        .search-shortcut {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.725rem;
+            font-weight: 700;
+            padding: 0.15rem 0.45rem;
+            background: var(--panel-solid);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-muted);
+            pointer-events: none;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .pill-group {
+            display: flex;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .pill-btn {
+            padding: 0.45rem 1rem;
+            font-size: 0.825rem;
+            font-weight: 500;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background-color: var(--panel-solid);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-sm);
+            font-family: inherit;
+        }
+        .pill-btn:hover {
+            color: var(--text-main);
+            border-color: var(--border-hover);
+            transform: translateY(-1px);
+        }
+        .pill-btn.active {
+            background-color: var(--accent);
+            border-color: var(--accent);
+            color: #ffffff;
+            box-shadow: 0 2px 8px var(--accent-solid-glow);
+        }
+
+        /* Summary Dashboard Grid */
+        .summary-dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: var(--panel-bg);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summary-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--accent-glow);
+            color: var(--accent);
+        }
+
+        .summary-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-label {
+            font-size: 0.825rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-top: 0.15rem;
+        }
+
+        /* Services Grid Layout */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .service-card {
+            background: var(--panel-bg);
+            backdrop-filter: var(--backdrop-filter);
+            -webkit-backdrop-filter: var(--backdrop-filter);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            transition: all 0.2s ease;
+        }
+        .service-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .service-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .service-card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
+        }
+
+        .service-card-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            background: rgba(0,0,0,0.02);
+            padding: 0.85rem 1rem;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+        [data-theme="dark"] .service-card-details {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .service-detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .service-subdetails-accordion {
+            background: var(--panel-solid);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+        }
+        .service-subdetails-accordion summary {
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .details-key {
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        /* Empty state styling */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 4rem 2rem;
+            background: var(--panel-bg);
+            border: 1px dashed var(--border-color);
+            border-radius: 14px;
+            color: var(--text-muted);
+            gap: 0.5rem;
+        }
+        .empty-state-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+    </style>
+    @RenderSection("Styles", required: false)
+</head>
+<body>
+
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <span>AppPipe.NET</span>
+        </div>
+        <div class="sidebar-nav">
+            <a class="nav-item @(path.EndsWith("/dashboard") || path.EndsWith("/dashboard/") ? "active" : "")" href="@Url.Content("~/dashboard")">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                <span>Command Center</span>
+            </a>
+            <a class="nav-item @(path.Contains("/dashboard/logs") ? "active" : "")" href="@Url.Content("~/dashboard/logs")">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                <span>Console Logs</span>
+            </a>
+            <a class="nav-item @(path.Contains("/dashboard/traces") ? "active" : "")" href="@Url.Content("~/dashboard/traces")">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                <span>Distributed Traces</span>
+            </a>
+            <a class="nav-item @(path.Contains("/dashboard/metrics") ? "active" : "")" href="@Url.Content("~/dashboard/metrics")">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                <span>Metrics</span>
+            </a>
+            <a class="nav-item @(path.Contains("/dashboard/service-map") ? "active" : "")" href="@Url.Content("~/dashboard/service-map")">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M20 4h2v2M2 20h2v2M18 12a6 6 0 1 0-12 0"></path><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                <span>Service Map</span>
+            </a>
+        </div>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="theme-icon"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></path></svg>
+                <span id="theme-text">Light Mode</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+        <div class="top-header">
+            <div class="header-left">
+                <span class="header-title">
+                    <span id="header-tab-title">Command Center</span>
+                    <div class="spinner" id="loading-spinner"></div>
+                </span>
+                <span class="buffer-indicator" id="buffer-indicator" style="display:none;">Logs: 0 / 500</span>
+            </div>
+            <div class="header-actions">
+                <button class="aspire-btn" onclick="togglePause()" id="pause-btn" title="Automatically refreshes dashboard telemetry data every 10 seconds" style="border-color: var(--accent); background-color: var(--accent-glow); color: var(--accent);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" id="pause-icon"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <span id="pause-btn-text">Auto-Refresh: ON</span>
+                </button>
+                <button class="aspire-btn" onclick="clearTelemetry()" id="clear-btn" style="display:none;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    <span>Clear</span>
+                </button>
+                <button class="aspire-btn aspire-btn-primary" onclick="forceRefresh()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            @RenderBody()
+        </div>
+    </div>
+
+    <!-- Sliding Info Drawer for Span details -->
+    <div class="sliding-panel" id="span-detail-drawer">
+        <div class="panel-header">
+            <span style="font-weight: 700; font-size: 1.05rem;" id="drawer-span-name">Span Details</span>
+            <button class="aspire-btn" style="padding: 0.3rem 0.6rem; font-size:0.8rem;" onclick="closeSpanDrawer()">Close</button>
+        </div>
+        <div class="panel-body" id="drawer-span-body">
+            <!-- Populated dynamically -->
+        </div>
+    </div>
+
+    <!-- Toast Notifications container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        const state = {
+            activeTab: 'services',
+            services: [],
+            logs: [],
+            traces: [],
+            metrics: [],
+            isPaused: false,
+            theme: localStorage.getItem('apppipe_theme') || 'dark',
+            refreshInterval: null
+        };
+
+        // Toast notifications logic
+        function showNotification(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            let icon = '';
+            if (type === 'success') {
+                icon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+            } else {
+                icon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+            }
+
+            toast.innerHTML = `${icon} <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px) scale(0.95)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Theme Toggle helper
+        function applyTheme() {
+            document.documentElement.setAttribute('data-theme', state.theme);
+            const text = state.theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+            document.getElementById('theme-text').innerText = text;
+            
+            const icon = document.getElementById('theme-icon');
+            if (state.theme === 'dark') {
+                icon.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+            } else {
+                icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+            }
+        }
+
+        function toggleTheme() {
+            state.theme = state.theme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('apppipe_theme', state.theme);
+            applyTheme();
+        }
+
+        // Live refresh controls
+        function togglePause() {
+            state.isPaused = !state.isPaused;
+            const btn = document.getElementById('pause-btn');
+            const btnText = document.getElementById('pause-btn-text');
+            const icon = document.getElementById('pause-icon');
+            if (state.isPaused) {
+                btnText.innerText = 'Auto-Refresh: OFF';
+                icon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
+                btn.style.borderColor = 'var(--border-color)';
+                btn.style.backgroundColor = 'var(--panel-solid)';
+                btn.style.color = 'var(--text-muted)';
+                showNotification('Auto-refresh disabled', 'info');
+            } else {
+                btnText.innerText = 'Auto-Refresh: ON';
+                icon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+                btn.style.borderColor = 'var(--accent)';
+                btn.style.backgroundColor = 'var(--accent-glow)';
+                btn.style.color = 'var(--accent)';
+                showNotification('Auto-refresh enabled (10s interval)', 'success');
+                forceRefresh();
+            }
+        }
+
+        function forceRefresh() {
+            fetchTelemetryData();
+            showNotification('Telemetry data refreshed', 'success');
+        }
+
+        async function clearTelemetry() {
+            if (!confirm(`Are you sure you want to clear all ${state.activeTab} telemetry database records?`)) return;
+            try {
+                let endpoint = '';
+                if (state.activeTab === 'logs') endpoint = '/api/logs/clear';
+                else if (state.activeTab === 'traces') endpoint = '/api/traces/clear';
+                else if (state.activeTab === 'metrics') endpoint = '/api/metrics/clear';
+
+                if (endpoint) {
+                    const baseUrl = getBaseUrl();
+                    await fetch(baseUrl + endpoint, { method: 'POST' });
+                    showNotification('Data cleared successfully', 'success');
+                    fetchTelemetryData();
+                }
+            } catch (err) {
+                showNotification('Failed to clear database', 'error');
+                console.error(err);
+            }
+        }
+
+        function showSpinner() {
+            document.getElementById('loading-spinner').style.display = 'inline-block';
+        }
+
+        function hideSpinner() {
+            document.getElementById('loading-spinner').style.display = 'none';
+        }
+
+        function updateBufferIndicator() {
+            const buffer = document.getElementById('buffer-indicator');
+            if (state.activeTab === 'logs') {
+                buffer.innerText = `Logs: ${state.logs.length} / 500`;
+            } else if (state.activeTab === 'traces') {
+                buffer.innerText = `Traces: ${Object.keys(state.traces).length} / 500`;
+            } else if (state.activeTab === 'metrics') {
+                buffer.innerText = `Metric Data: ${state.metrics.length} points`;
+            }
+        }
+
+        function getBaseUrl() {
+            const path = window.location.pathname;
+            const idx = path.indexOf('/dashboard');
+            return idx >= 0 ? path.substring(0, idx) : '';
+        }
+
+        async function fetchTelemetryData() {
+            showSpinner();
+            try {
+                const baseUrl = getBaseUrl();
+                
+                const servicesRes = await fetch(baseUrl + '/api/services');
+                state.services = await servicesRes.json();
+
+                const logsRes = await fetch(baseUrl + '/api/logs');
+                state.logs = await logsRes.json();
+
+                const tracesRes = await fetch(baseUrl + '/api/traces');
+                const rawTraces = await tracesRes.json();
+                
+                state.traces = {};
+                if (Array.isArray(rawTraces)) {
+                    rawTraces.forEach(t => state.traces[t.traceId] = t);
+                } else if (rawTraces && typeof rawTraces === 'object') {
+                    state.traces = rawTraces;
+                }
+
+                const metricsRes = await fetch(baseUrl + '/api/metrics');
+                state.metrics = await metricsRes.json();
+
+                updateBufferIndicator();
+                
+                if (typeof updateOverviewStats === 'function') {
+                    updateOverviewStats();
+                }
+
+                if (typeof renderActiveTab === 'function') {
+                    renderActiveTab();
+                }
+            } catch (err) {
+                console.error('Failed to pull API data:', err);
+            } finally {
+                hideSpinner();
+            }
+        }
+
+        function closeSpanDrawer() {
+            document.getElementById('span-detail-drawer').classList.remove('open');
+            document.querySelectorAll('.waterfall-row').forEach(row => row.classList.remove('selected-span'));
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        window.addEventListener('load', () => {
+            applyTheme();
+            
+            // Set header title
+            const titleElement = document.getElementById('header-tab-title');
+            if (state.activeTab === 'services') titleElement.innerText = 'Command Center';
+            else if (state.activeTab === 'logs') titleElement.innerText = 'Console Logs';
+            else if (state.activeTab === 'traces') titleElement.innerText = 'Distributed Traces';
+            else if (state.activeTab === 'metrics') titleElement.innerText = 'Metrics';
+            else if (state.activeTab === 'service-map') titleElement.innerText = 'Service Map';
+
+            // Show or hide clear & buffer tags
+            const buffer = document.getElementById('buffer-indicator');
+            const clear = document.getElementById('clear-btn');
+            if (state.activeTab === 'logs' || state.activeTab === 'traces' || state.activeTab === 'metrics') {
+                clear.style.display = 'inline-flex';
+                buffer.style.display = 'inline-flex';
+            } else {
+                clear.style.display = 'none';
+                buffer.style.display = 'none';
+            }
+
+            // Perform fetch immediately on load
+            fetchTelemetryData();
+
+            state.refreshInterval = setInterval(() => {
+                if (!state.isPaused) {
+                    fetchTelemetryData();
+                }
+            }, 10000);
+        });
+    </script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

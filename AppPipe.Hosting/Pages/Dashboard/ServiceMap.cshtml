@@ -1,0 +1,378 @@
+@page "/dashboard/service-map"
+@{
+    ViewData["Title"] = "Service Map";
+}
+
+@section Styles {
+    <style>
+        .map-svg-container {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 480px;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .map-zoom-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: var(--panel-solid);
+            padding: 6px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-md);
+            z-index: 10;
+        }
+
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--panel-solid);
+            color: var(--text-main);
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .zoom-btn:hover {
+            background: var(--panel-bg-hover);
+        }
+
+        .node-circle {
+            fill: var(--panel-solid);
+            stroke-width: 2.5px;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.1));
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .node-group {
+            cursor: pointer;
+        }
+
+        .node-group:hover .node-circle {
+            stroke-width: 4px;
+            transform: scale(1.05);
+            filter: drop-shadow(0 4px 12px var(--accent-solid-glow));
+        }
+
+        .node-text {
+            font-size: 0.725rem;
+            font-weight: 600;
+            fill: var(--text-main);
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        .edge-line {
+            transition: all 0.2s;
+        }
+
+        .edge-label-bg {
+            fill: var(--panel-solid);
+            stroke: var(--border-color);
+            rx: 4px;
+            ry: 4px;
+        }
+
+        .edge-label-text {
+            font-size: 0.65rem;
+            font-weight: 700;
+            fill: var(--text-muted);
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+    </style>
+}
+
+<div class="map-wrapper">
+    <div class="map-svg-container" id="map-svg-container">
+        <!-- SVG Circular Topology Map -->
+    </div>
+    
+    <div class="aspire-table-container">
+        <table class="aspire-table">
+            <thead>
+                <tr>
+                    <th>Calling Node (Client)</th>
+                    <th>Receiving Node (Server)</th>
+                    <th>Call Count</th>
+                    <th>Error Count</th>
+                    <th>Success Rate</th>
+                    <th>Average Duration</th>
+                </tr>
+            </thead>
+            <tbody id="map-table-body">
+                <!-- Edge details table -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        state.activeTab = 'service-map';
+        state.mapZoom = 1;
+        state.mapPanX = 0;
+        state.mapPanY = 0;
+        state.isDraggingMap = false;
+        state.dragStartX = 0;
+        state.dragStartY = 0;
+
+        function zoomServiceMap(amount) {
+            state.mapZoom += amount;
+            if (state.mapZoom < 0.5) state.mapZoom = 0.5;
+            if (state.mapZoom > 3) state.mapZoom = 3;
+            applyServiceMapTransform();
+        }
+
+        function resetServiceMap() {
+            state.mapZoom = 1;
+            state.mapPanX = 0;
+            state.mapPanY = 0;
+            applyServiceMapTransform();
+            showNotification('Map viewport reset', 'info');
+        }
+
+        function applyServiceMapTransform() {
+            const viewport = document.getElementById('map-viewport');
+            if (viewport) {
+                viewport.setAttribute('transform', `translate(${state.mapPanX}, ${state.mapPanY}) scale(${state.mapZoom})`);
+            }
+        }
+
+        function onMapMouseDown(e) {
+            state.isDraggingMap = true;
+            state.dragStartX = e.clientX - state.mapPanX;
+            state.dragStartY = e.clientY - state.mapPanY;
+            document.getElementById('map-svg-element').style.cursor = 'grabbing';
+        }
+
+        function onMapMouseMove(e) {
+            if (!state.isDraggingMap) return;
+            state.mapPanX = e.clientX - state.dragStartX;
+            state.mapPanY = e.clientY - state.dragStartY;
+            applyServiceMapTransform();
+        }
+
+        function onMapMouseUp() {
+            state.isDraggingMap = false;
+            const element = document.getElementById('map-svg-element');
+            if (element) element.style.cursor = 'grab';
+        }
+
+        function parseDurationMs(durationVal) {
+            if (durationVal === null || durationVal === undefined) return 0;
+            if (typeof durationVal === 'number') return durationVal;
+            const durationStr = String(durationVal);
+            if (durationStr.includes(':')) {
+                const parts = durationStr.split(':');
+                const hrs = parseFloat(parts[0]) || 0;
+                const mins = parseFloat(parts[1]) || 0;
+                const secs = parseFloat(parts[2]) || 0;
+                return (hrs * 3600 + mins * 60 + secs) * 1000;
+            }
+            const parsed = parseFloat(durationStr);
+            return isNaN(parsed) ? 0 : parsed;
+        }
+
+        function renderActiveTab() {
+            const edges = {};
+            const nodes = {};
+
+            Object.values(state.traces).forEach(trace => {
+                if (!trace.allSpans || trace.allSpans.length === 0) return;
+                
+                const spanMap = {};
+                trace.allSpans.forEach(s => spanMap[s.spanId] = s);
+
+                trace.allSpans.forEach(span => {
+                    if (!nodes[span.serviceName]) {
+                        nodes[span.serviceName] = { name: span.serviceName, totalCalls: 0, errorCalls: 0, totalDurationMs: 0 };
+                    }
+                    nodes[span.serviceName].totalCalls++;
+                    nodes[span.serviceName].totalDurationMs += parseDurationMs(span.duration);
+                    if (span.isError) {
+                        nodes[span.serviceName].errorCalls++;
+                    }
+
+                    if (span.parentSpanId) {
+                        const parent = spanMap[span.parentSpanId];
+                        if (parent && parent.serviceName !== span.serviceName) {
+                            const key = `${parent.serviceName}->${span.serviceName}`;
+                            if (!edges[key]) {
+                                edges[key] = {
+                                    from: parent.serviceName,
+                                    to: span.serviceName,
+                                    callCount: 0,
+                                    errorCount: 0,
+                                    totalDurationMs: 0
+                                };
+                            }
+                            edges[key].callCount++;
+                            edges[key].totalDurationMs += parseDurationMs(span.duration);
+                            if (span.isError) {
+                                edges[key].errorCount++;
+                            }
+                        }
+                    }
+                });
+            });
+
+            const nodeNames = Object.keys(nodes);
+            const edgeList = Object.values(edges);
+            const mapContainer = document.getElementById('map-svg-container');
+            const tableBody = document.getElementById('map-table-body');
+
+            if (nodeNames.length === 0) {
+                mapContainer.innerHTML = '<div class="empty-state" style="border:none; min-height:350px; text-align:center; padding:3rem;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle></svg><div class="empty-state-title" style="font-weight:700; margin-top:0.5rem;">No Service Map Data</div><div style="color:var(--text-muted);">Run your microservices and trigger endpoints to construct the call map.</div></div>';
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:1rem;">No service dependency calls recorded yet.</td></tr>';
+                return;
+            }
+
+            const centerX = 300;
+            const centerY = 240;
+            const radius = 145;
+
+            const positions = {};
+            nodeNames.forEach((node, i) => {
+                const angle = (i * 2 * Math.PI) / nodeNames.length;
+                positions[node] = {
+                    x: centerX + radius * Math.cos(angle),
+                    y: centerY + radius * Math.sin(angle)
+                };
+            });
+
+            let svgContent = `
+                <div class="map-zoom-controls">
+                    <button class="zoom-btn" onclick="zoomServiceMap(0.15)">+</button>
+                    <button class="zoom-btn" onclick="zoomServiceMap(-0.15)">-</button>
+                    <button class="zoom-btn" style="font-size:0.8rem; font-weight:600;" onclick="resetServiceMap()">⟲</button>
+                </div>
+                <svg class="map-svg" id="map-svg-element" width="100%" height="450" viewBox="0 0 600 480" 
+                     style="cursor: grab; user-select: none;"
+                     onmousedown="onMapMouseDown(event)" 
+                     onmousemove="onMapMouseMove(event)"
+                     onmouseup="onMapMouseUp()"
+                     onmouseleave="onMapMouseUp()">
+                    <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="28" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--text-muted)" />
+                        </marker>
+                        <marker id="arrow-green" viewBox="0 0 10 10" refX="30" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981" />
+                        </marker>
+                        <marker id="arrow-warn" viewBox="0 0 10 10" refX="30" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+                        </marker>
+                        <marker id="arrow-error" viewBox="0 0 10 10" refX="30" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
+                        </marker>
+                    </defs>
+                    <g id="map-viewport">
+            `;
+
+            const maxCalls = edgeList.length > 0 ? Math.max(...edgeList.map(e => e.callCount)) : 1;
+
+            edgeList.forEach(edge => {
+                const fromPos = positions[edge.from];
+                const toPos = positions[edge.to];
+                if (!fromPos || !toPos) return;
+
+                const errorRate = edge.callCount > 0 ? (edge.errorCount / edge.callCount) * 100 : 0;
+                let strokeColor = '#10b981';
+                let markerId = 'arrow-green';
+                if (errorRate > 20) {
+                    strokeColor = '#ef4444';
+                    markerId = 'arrow-error';
+                } else if (errorRate > 5) {
+                    strokeColor = '#f59e0b';
+                    markerId = 'arrow-warn';
+                }
+
+                const strokeWidth = 1.5 + (edge.callCount / maxCalls) * 4.5;
+                
+                svgContent += `
+                    <path class="edge-line" d="M ${fromPos.x} ${fromPos.y} L ${toPos.x} ${toPos.y}" 
+                          stroke="${strokeColor}" stroke-width="${strokeWidth}" 
+                          marker-end="url(#${markerId})" opacity="0.8"/>
+                `;
+
+                const midX = (fromPos.x + toPos.x) / 2;
+                const midY = (fromPos.y + toPos.y) / 2;
+                svgContent += `
+                    <g>
+                        <rect class="edge-label-bg" x="${midX - 14}" y="${midY - 8}" width="28" height="15" />
+                        <text class="edge-label-text" x="${midX}" y="${midY}">${edge.callCount}</text>
+                    </g>
+                `;
+            });
+
+            nodeNames.forEach(node => {
+                const pos = positions[node];
+                const stats = nodes[node];
+                const errorRate = stats.totalCalls > 0 ? (stats.errorCalls / stats.totalCalls) * 100 : 0;
+                
+                let strokeColor = 'var(--accent)';
+                if (errorRate > 20) strokeColor = '#ef4444';
+                else if (errorRate > 5) strokeColor = '#f59e0b';
+
+                const displayName = node.length > 12 ? node.substring(0, 10) + '..' : node;
+
+                // Redirect to logs page filtered to this service
+                const logsPageUrl = `${getBaseUrl()}/dashboard/logs`;
+
+                svgContent += `
+                    <g class="node-group" onclick="location.href='${logsPageUrl}'" style="transform-origin: ${pos.x}px ${pos.y}px;">
+                        <circle class="node-circle" cx="${pos.x}" cy="${pos.y}" r="22" stroke="${strokeColor}" fill="var(--panel-solid)" />
+                        <text class="node-text" x="${pos.x}" y="${pos.y + 4}">${escapeHtml(displayName)}</text>
+                        <title>${node} (${stats.totalCalls} calls, Error Rate: ${errorRate.toFixed(1)}%)</title>
+                    </g>
+                `;
+            });
+
+            svgContent += `</g></svg>`;
+            mapContainer.innerHTML = svgContent;
+            
+            applyServiceMapTransform();
+
+            let tableHtml = '';
+            edgeList.forEach(edge => {
+                const errorRate = edge.callCount > 0 ? (edge.errorCount / edge.callCount) * 100 : 0;
+                const successRate = 100 - errorRate;
+                const avgLatency = edge.callCount > 0 ? edge.totalDurationMs / edge.callCount : 0;
+                
+                let rateBadge = 'badge-success';
+                if (errorRate > 20) rateBadge = 'badge-error';
+                else if (errorRate > 5) rateBadge = 'badge-warn';
+
+                tableHtml += `
+                    <tr>
+                        <td style="font-weight:600;">${edge.from}</td>
+                        <td style="font-weight:600;">${edge.to}</td>
+                        <td class="mono">${edge.callCount}</td>
+                        <td class="mono">${edge.errorCount}</td>
+                        <td><span class="badge ${rateBadge}">${successRate.toFixed(1)}%</span></td>
+                        <td class="mono">${avgLatency.toFixed(1)} ms</td>
+                    </tr>
+                `;
+            });
+            tableBody.innerHTML = tableHtml;
+        }
+    </script>
+}

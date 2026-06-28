@@ -106,33 +106,4 @@ public class DashboardTests
 
         // Cleanup
         await gatewayHost.StopAsync();
-    }
-
-    [Fact]
-    public async Task Dashboard_BlazorNegotiate_ShouldReturnOk()
-    {
-        // 1. Arrange
-        var builder = AppPipeHostingApp.CreateBuilder(null!);
-        var hostProject = new AppPipeHostingProjectResource("AppPipe.DevHost", "");
-        hostProject.WithEndpoint(0);
-        builder.HostProject = hostProject;
-        var app = builder.Build();
-
-        var gatewayHost = new GatewayAppPipeHost();
-        var ports = await gatewayHost.StartAsync(string.Empty, app);
-
-        using var httpClient = new HttpClient();
-        var baseUri = $"http://localhost:{ports.DashboardPort}";
-
-        // 2. Act
-        var response = await httpClient.PostAsync($"{baseUri}/_blazor/negotiate?negotiateVersion=1", null);
-
-        // 3. Assert
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var content = await response.Content.ReadAsStringAsync();
-        Assert.Contains("connectionId", content);
-
-        // Cleanup
-        await gatewayHost.StopAsync();
-    }
-}
+    }}
