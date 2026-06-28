@@ -5,7 +5,7 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.AppHost", "AppPipeSystem.AppHost\AppPipeSystem.AppHost.csproj", "{A0FA17D5-42E2-441F-AF1A-C54FA8EE1D9A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.ApiService", "AppPipeSystem.ApiService\AppPipeSystem.ApiService.csproj", "{C4E72591-D36A-4A0B-971B-CE7A16891F4A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.BackendApi", "AppPipeSystem.BackendApi\AppPipeSystem.BackendApi.csproj", "{C4E72591-D36A-4A0B-971B-CE7A16891F4A}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AppPipeSystem.Web", "AppPipeSystem.Web\AppPipeSystem.Web.csproj", "{B9EF851F-14C2-4B38-B506-69EF851FAF1F}"
 EndProject
@@ -47,3 +47,4 @@ Global
 		{DB5E602A-84A0-449D-BBDE-20C926891F4C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
+

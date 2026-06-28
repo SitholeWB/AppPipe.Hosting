@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace AppPipeSystem.ApiService;
+namespace AppPipeSystem.BackendApi;
 
 public class AppDbContext : DbContext
 {
@@ -21,3 +21,4 @@ public class AppDbContext : DbContext
         );
     }
 }
+

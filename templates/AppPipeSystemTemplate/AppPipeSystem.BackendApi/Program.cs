@@ -15,7 +15,7 @@ using System.Security.Claims;
 using System.Text;
 #endif
 
-namespace AppPipeSystem.ApiService;
+namespace AppPipeSystem.BackendApi;
 
 public class Program
 {
@@ -24,7 +24,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // 1. Identify your service for the dashboard
-        var resourceBuilder = ResourceBuilder.CreateDefault().AddService("ApiService");
+        var resourceBuilder = ResourceBuilder.CreateDefault().AddService("BackendApi");
 
         // 2. Add Traces & Metrics, ensuring AddOtlpExporter() is called
         builder.Services.AddOpenTelemetry()
@@ -108,8 +108,8 @@ public class Program
         // 7. Mapped Endpoints
         app.MapGet("/", () =>
         {
-            app.Logger.LogInformation("ApiService backend received a request.");
-            return Results.Ok(new { message = "Hello from ApiService" });
+            app.Logger.LogInformation("BackendApi backend received a request.");
+            return Results.Ok(new { message = "Hello from BackendApi" });
         });
 
         app.MapGet("/products", async (AppDbContext db
@@ -183,3 +183,4 @@ public class Program
         app.Run();
     }
 }
+

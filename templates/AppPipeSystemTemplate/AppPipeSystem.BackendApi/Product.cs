@@ -1,4 +1,4 @@
-namespace AppPipeSystem.ApiService;
+namespace AppPipeSystem.BackendApi;
 
 public class Product
 {
@@ -15,3 +15,4 @@ public class Product
         Price = price;
     }
 }
+

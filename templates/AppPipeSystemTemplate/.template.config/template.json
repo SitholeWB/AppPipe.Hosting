@@ -19,7 +19,7 @@
       "type": "parameter",
       "dataType": "choice",
       "defaultValue": "simple",
-      "description": "Choose the architecture pattern for the ApiService.",
+      "description": "Choose the architecture pattern for the BackendApi.",
       "choices": [
         {
           "choice": "simple",
@@ -35,7 +35,7 @@
       "type": "parameter",
       "dataType": "choice",
       "defaultValue": "none",
-      "description": "Choose the database provider for the ApiService.",
+      "description": "Choose the database provider for the BackendApi.",
       "choices": [
         { "choice": "none", "description": "No database context." },
         { "choice": "sqlite", "description": "SQLite EF Core context." },
@@ -60,7 +60,7 @@
       "description": "Choose authentication type.",
       "choices": [
         { "choice": "none", "description": "No authentication configured." },
-        { "choice": "jwt", "description": "JWT Bearer authentication on ApiService." }
+        { "choice": "jwt", "description": "JWT Bearer authentication on BackendApi." }
       ]
     },
     "caching": {
@@ -115,7 +115,7 @@
             "AppPipeSystem.Domain/**",
             "AppPipeSystem.Application/**",
             "AppPipeSystem.Infrastructure/**",
-            "AppPipeSystem.CleanApiService/**",
+            "AppPipeSystem.CleanBackendApi/**",
             "AppPipeSystem.clean.sln"
           ],
           "rename": {
@@ -125,13 +125,13 @@
         {
           "condition": "(architecture == \"clean-cqrs\")",
           "exclude": [
-            "AppPipeSystem.ApiService/**",
+            "AppPipeSystem.BackendApi/**",
             "AppPipeSystem.simple.sln"
           ],
           "rename": {
             "AppPipeSystem.clean.sln": "AppPipeSystem.sln",
-            "AppPipeSystem.CleanApiService/AppPipeSystem.CleanApiService.csproj": "AppPipeSystem.ApiService/AppPipeSystem.ApiService.csproj",
-            "AppPipeSystem.CleanApiService": "AppPipeSystem.ApiService"
+            "AppPipeSystem.CleanBackendApi/AppPipeSystem.CleanBackendApi.csproj": "AppPipeSystem.BackendApi/AppPipeSystem.BackendApi.csproj",
+            "AppPipeSystem.CleanBackendApi": "AppPipeSystem.BackendApi"
           }
         },
         {
@@ -158,3 +158,4 @@
     }
   ]
 }
+

@@ -36,7 +36,7 @@ public class IndexModel : PageModel
 
         try
         {
-            var client = _clientFactory.CreateClient("ApiService");
+            var client = _clientFactory.CreateClient("BackendApi");
 
 #if UseJwtAuth
             // Obtain mock token first
@@ -65,7 +65,7 @@ public class IndexModel : PageModel
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create product");
-            return StatusCode(500, "Error communicating with ApiService");
+            return StatusCode(500, "Error communicating with BackendApi");
         }
     }
 
@@ -73,7 +73,7 @@ public class IndexModel : PageModel
     {
         try
         {
-            var client = _clientFactory.CreateClient("ApiService");
+            var client = _clientFactory.CreateClient("BackendApi");
             var result = await client.GetFromJsonAsync<List<ProductItem>>("products");
             if (result != null)
             {
@@ -99,3 +99,4 @@ public class IndexModel : PageModel
         public string Token { get; set; } = string.Empty;
     }
 }
+

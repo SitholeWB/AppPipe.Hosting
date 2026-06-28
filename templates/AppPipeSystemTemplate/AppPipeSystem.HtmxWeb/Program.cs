@@ -38,10 +38,10 @@ public class Program
         // 4. Register Razor Pages
         builder.Services.AddRazorPages();
 
-        // 5. Configure HTTP Client targeting ApiService
-        builder.Services.AddHttpClient("ApiService", client =>
+        // 5. Configure HTTP Client targeting BackendApi
+        builder.Services.AddHttpClient("BackendApi", client =>
         {
-            var address = builder.Configuration["services:ApiService:http:0"];
+            var address = builder.Configuration["services:BackendApi:http:0"];
             if (!string.IsNullOrEmpty(address))
             {
                 client.BaseAddress = new Uri(address);
@@ -58,3 +58,4 @@ public class Program
         app.Run();
     }
 }
+

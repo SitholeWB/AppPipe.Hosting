@@ -139,6 +139,75 @@ For example, to scaffold a full production CQRS architecture with a Blazor front
 dotnet new app-pipe -n MySystem --architecture clean-cqrs --database sqlite --auth jwt --caching redis
 ```
 
+---
+
+## 🔌 Integrating AppPipe into Existing Solutions
+
+If you already have an existing .NET microservices solution and want to add AppPipe orchestration, dashboarding, and telemetry, follow these steps:
+
+### 1. Create the AppHost Orchestrator Project
+Add a new empty .NET Console or Web application project named `YourSolution.AppHost` to your existing solution:
+```bash
+dotnet new web -n YourSolution.AppHost
+```
+
+### 2. Add Package and Project References
+1. Install the `AppPipe.Hosting` package to the new AppHost project:
+   ```bash
+   dotnet add YourSolution.AppHost/YourSolution.AppHost.csproj package AppPipe.Hosting
+   ```
+2. Reference your existing microservices from the AppHost project using standard Project References:
+   ```bash
+   dotnet add YourSolution.AppHost/YourSolution.AppHost.csproj reference YourExisting.Backend/YourExisting.Backend.csproj
+   dotnet add YourSolution.AppHost/YourSolution.AppHost.csproj reference YourExisting.Frontend/YourExisting.Frontend.csproj
+   ```
+
+### 3. Write the Orchestration Entry Point
+Replace the contents of `Program.cs` in the `YourSolution.AppHost` project with:
+```csharp
+using AppPipe.Hosting;
+
+var builder = AppPipeHostingApp.CreateBuilder(args);
+
+// Register your referenced projects:
+// Note: AppPipe automatically generates compile-safe constants for your projects
+// (e.g. AppPipeProjects.YourExisting_Backend) during compilation!
+var backend = builder.AddProject(AppPipeProjects.YourExisting_Backend)
+                     .WithEndpoint(5001); // Assign an entry endpoint port
+
+var frontend = builder.AddProject(AppPipeProjects.YourExisting_Frontend)
+                      .WithEndpoint(5002)
+                      .WithReference(backend); // Automatically injects discovery environment variables
+
+var app = builder.Build();
+
+// Run the local orchestrator and OTLP collector
+var runner = new AppPipeDevHostRunner(app);
+await runner.RunAsync();
+```
+
+### 4. Configure OpenTelemetry in Your Existing Services
+In each of your child microservices, add OpenTelemetry OTLP exporters. AppPipe automatically injects the OTLP telemetry ports and service discovery variables as environment values into your processes at run-time:
+
+1. Install the OpenTelemetry packages in your child projects:
+   ```bash
+   dotnet add package OpenTelemetry.Extensions.Hosting
+   dotnet add package OpenTelemetry.Instrumentation.AspNetCore
+   dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
+   ```
+2. Configure it in their `Program.cs`:
+   ```csharp
+   builder.Services.AddOpenTelemetry()
+       .WithTracing(tracing => tracing
+           .AddAspNetCoreInstrumentation()
+           .AddOtlpExporter()) // Automatically picks up AppPipe gRPC port
+       .WithMetrics(metrics => metrics
+           .AddAspNetCoreInstrumentation()
+           .AddOtlpExporter()); // Automatically picks up AppPipe gRPC port
+   ```
+
+---
+
 ### 4. Generated Solution Structure
 The template creates a solution containing the following pre-integrated projects:
 * **`MySystem.AppHost`**: The AppPipe gateway reverse proxy and telemetry dashboard. It references the microservices with decoupled configurations to prevent publish file conflicts.

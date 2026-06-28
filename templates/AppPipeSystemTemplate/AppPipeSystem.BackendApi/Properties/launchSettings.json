@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "AppPipeSystem.ApiService": {
+    "AppPipeSystem.BackendApi": {
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {

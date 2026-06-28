@@ -291,13 +291,13 @@
     {
         try
         {
-            var client = ClientFactory.CreateClient("ApiService");
+            var client = ClientFactory.CreateClient("BackendApi");
             products = await client.GetFromJsonAsync<List<ProductItem>>("products");
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load products");
-            statusMessage = "Could not connect to backend ApiService.";
+            statusMessage = "Could not connect to backend BackendApi.";
             isError = true;
             products = new();
         }
@@ -309,7 +309,7 @@
 
         try
         {
-            var client = ClientFactory.CreateClient("ApiService");
+            var client = ClientFactory.CreateClient("BackendApi");
 
 #if UseJwtAuth
             // Obtain mock token first
@@ -344,7 +344,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to create product");
-            statusMessage = "Error communicating with backend ApiService.";
+            statusMessage = "Error communicating with backend BackendApi.";
             isError = true;
         }
     }
@@ -361,3 +361,4 @@
         public string Token { get; set; } = string.Empty;
     }
 }
+
