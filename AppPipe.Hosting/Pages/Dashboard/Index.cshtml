@@ -101,11 +101,19 @@
                     envVarsTableHtml += '</tbody></table>';
                 }
 
+                const targetUrl = srv.appPath 
+                    ? `${window.location.protocol}//${window.location.host}${srv.appPath.startsWith('/') ? srv.appPath : '/' + srv.appPath}` 
+                    : (srv.port ? `${window.location.protocol}//${window.location.hostname}:${srv.port}` : 'N/A');
+                
+                const linkHtml = targetUrl !== 'N/A' 
+                    ? `<a href="${targetUrl}" target="_blank" style="color:var(--accent); font-weight:600; word-break: break-all;">${targetUrl}</a>` 
+                    : 'N/A';
+
                 html += `
                     <div class="service-card">
                         <div class="service-card-header">
                             <span class="service-card-title">${srv.name}</span>
-                            <div style="display:flex; gap:0.4rem;">
+                            <div style="display:flex; gap:0.4rem; flex-wrap: wrap;">
                                 ${errorPill}
                                 <span class="badge ${badgeClass}">${srv.type}</span>
                             </div>
@@ -113,9 +121,8 @@
                         <div class="service-card-details">
                             <div class="service-detail-row">
                                 <span class="details-key">Port/Endpoints:</span>
-                                <span class="mono">${srv.port ? `<a href="http://localhost:${srv.port}" target="_blank" style="color:var(--accent); font-weight:600;">http://localhost:${srv.port}</a>` : 'N/A'}</span>
-                            </div>
-                            ${srv.appPath ? `
+                                <span class="mono">${linkHtml}</span>
+                            </div>` + (srv.appPath ? `
                             <div class="service-detail-row">
                                 <span class="details-key">App Path:</span>
                                 <span class="mono" style="font-weight:600;">${srv.appPath}</span>
