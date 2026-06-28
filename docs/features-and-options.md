@@ -104,7 +104,40 @@ A visual dashboard that allows real-time diagnostics:
 * **Metric Graphs**: Visual charts plotting memory, CPU, and custom metrics.
 * **Auto-Refresh controls**: Integrated toggle in the header bar allowing background polling to be easily enabled or paused, operating with a default 10-second frequency to conserve system resources. Works flawlessly under IIS reverse proxies and sub-applications.
 
+### 5. Server-Side URL Resolution
+To support flexible deployment environments (such as local Kestrel debugging, multi-server VMs, dedicated IIS website port pools, and Windows Services / Linux daemons), the AppPipe Dashboard implements a dynamic server-side URL resolution engine inside the `/api/services` REST endpoint:
+
+#### 🔍 URL Resolution Flow & Heuristics
+The resolved URL is computed for each resource using the following order of precedence:
+
+1. **Configuration Overrides (`AppPipe:Endpoints:{ResourceName}`)**:
+   If a resource URL is explicitly mapped in `appsettings.json` or environment variables, AppPipe bypasses all dynamic heuristics and uses this string directly.
+   ```json
+   {
+     "AppPipe": {
+       "Endpoints": {
+         "BackendWorker": "https://backend.myproductiondomain.com:5001"
+       }
+     }
+   }
+   ```
+2. **Environment & Local Development Detectors**:
+   AppPipe inspects `IWebHostEnvironment.EnvironmentName`. Any environment that does **not** start with `"Prod"` or `"Stage"` (e.g., `Development`, `LocalDev`, `Debug`, `Dev`) is classified as a local developer build.
+   * By default, local developer builds display direct port URLs (e.g. `http://localhost:5001`) to allow developers to bypass the gateway router and access microservice endpoints directly during active debugging.
+3. **Gateway URL Forcing (`AppPipe:UseGatewayUrls`)**:
+   You can override environment-based heuristics using the `AppPipe:UseGatewayUrls` boolean setting.
+   - When set to `true`, the dashboard will attempt to render gateway URLs.
+   - When set to `false`, the dashboard will render direct port/process URLs.
+   - When omitted, it defaults to `true` in production/staging environments, and `false` in local development.
+4. **IIS Site-Sharing (Sub-Application Gateway Routing)**:
+   In production/staging environments, AppPipe compares the IIS site name of the target resource (`IISSiteName`) with the IIS site name of the dashboard (`HostProject`):
+   - **Shared IIS Site**: If both resources share the same IIS Site name (e.g. `"Default Web Site"`) and the microservice has a configured `AppPath` (e.g. `/backend`), the resolved URL is formatted as a sub-application path under the dashboard's incoming host: `scheme://Request.Host/backend`.
+   - **Different IIS Sites / Standalone Ports**: If they are on separate IIS websites or hosted on distinct ports (like standalone Kestrel processes, Windows Services, or Linux daemons), the URL resolves directly to the dedicated port of the requesting host: `scheme://Request.Host.Host:{AssignedPort}`.
+5. **Multi-Server & Load Balancer Scaling**:
+   Rather than using hardcoded hostnames, the URL resolution engine parses the incoming HTTP request properties (`httpContext.Request.Scheme`, `Request.Host.Value`, and `Request.Host.Host`). This ensures that if the dashboard is accessed via a private IP, load-balancer DNS, or localhost, the links adapt dynamically and resolve correctly for the visiting client.
+
 ---
+
 
 ## 📦 Project Scaffolding Templates
 

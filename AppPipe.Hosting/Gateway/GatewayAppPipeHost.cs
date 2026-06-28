@@ -223,9 +223,56 @@ public class GatewayAppPipeHost
         _app.MapRazorPages();
 
         // REST JSON API endpoints for the HTML5 dashboard
-        _app.MapGet("/api/services", (AppPipeHostingApp? topology) =>
+        _app.MapGet("/api/services", (AppPipeHostingApp? topology, IConfiguration config, HttpContext httpContext, IWebHostEnvironment env) =>
         {
             if (topology == null) return Results.Json(Array.Empty<object>());
+
+            string GetServiceUrl(AppPipeHostingResource r)
+            {
+                var configured = config[$"AppPipe:Endpoints:{r.Name}"];
+                if (!string.IsNullOrEmpty(configured))
+                {
+                    return configured;
+                }
+                var envName = env.EnvironmentName ?? "Development";
+                var isLocalDev = !envName.StartsWith("Prod", System.StringComparison.OrdinalIgnoreCase) && 
+                                 !envName.StartsWith("Stage", System.StringComparison.OrdinalIgnoreCase);
+
+                var useGatewayUrls = config.GetValue<bool?>("AppPipe:UseGatewayUrls") ?? !isLocalDev;
+
+                var reqScheme = httpContext.Request.Scheme ?? "http";
+                var reqHost = httpContext.Request.Host.HasValue ? httpContext.Request.Host.Value : "localhost";
+                var reqHostName = httpContext.Request.Host.HasValue ? httpContext.Request.Host.Host : "localhost";
+
+                if (useGatewayUrls)
+                {
+                    var hostSite = topology?.HostProject?.IISSiteName;
+                    var resourceSite = r.IISSiteName;
+                    var sharesSite = !string.IsNullOrEmpty(hostSite) && 
+                                     !string.IsNullOrEmpty(resourceSite) && 
+                                     string.Equals(hostSite, resourceSite, System.StringComparison.OrdinalIgnoreCase);
+
+                    if (sharesSite && !string.IsNullOrEmpty(r.AppPath))
+                    {
+                        var path = r.AppPath;
+                        if (!path.StartsWith("/")) path = "/" + path;
+                        return $"{reqScheme}://{reqHost}{path}";
+                    }
+                    else if (r.AssignedPort > 0)
+                    {
+                        return $"{reqScheme}://{reqHostName}:{r.AssignedPort}";
+                    }
+                    return "N/A";
+                }
+                else
+                {
+                    if (r.AssignedPort > 0)
+                    {
+                        return $"{reqScheme}://{reqHostName}:{r.AssignedPort}";
+                    }
+                    return "N/A";
+                }
+            }
             
             object MapResource(AppPipeHostingResource r, string type) => new
             {
@@ -235,6 +282,7 @@ public class GatewayAppPipeHost
                 appPath = r.AppPath,
                 siteName = r.IISSiteName,
                 poolName = r.AppPoolName,
+                url = GetServiceUrl(r),
                 projectPath = (r is AppPipeHostingProjectResource pr) ? pr.ProjectPath : null,
                 command = (r is ExecutableAppPipeHostingResource er1) ? er1.Command : null,
                 workingDirectory = (r is ExecutableAppPipeHostingResource er2) ? er2.WorkingDirectory : null,

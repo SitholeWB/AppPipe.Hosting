@@ -309,11 +309,26 @@ You can customize the dashboard, security, and persistence behavior in your `app
 | `Telemetry:PersistenceEnabled` | `bool` | `true` | Set to `true` to enable SQLite telemetry database persistence. Set to `false` for purely in-memory buffer. |
 | `Telemetry:DatabasePath` | `string` | `telemetry.db` | The path to the persistent SQLite database file. |
 | `Telemetry:MaxDbRecords` | `int` | `2000` | Limits database rows retained per telemetry type. |
+| `AppPipe:UseGatewayUrls` | `bool` | `null` | If `true`, the dashboard displays links routed through the reverse proxy gateway. If `false`, displays direct process port links. When `null`, automatically defaults to `true` in production/staging environments, and `false` in development environments. |
+| `AppPipe:Endpoints:{Resource}`| `string` | `null` | Explicitly overrides a specific resource's dashboard link to use a manual URL (e.g. `AppPipe:Endpoints:BackendWorker` = `"http://backend.internal:5001"`). |
 
 ### 🔄 Configuring the Gateway via YARP
 AppPipe's gateway binds natively to standard .NET configuration under the `"ReverseProxy"` section. You can define custom routes, clusters, HTTP request properties, rate-limiting, and transforms inside your `appsettings.json`, or programmatically configure them using `.ConfigureGateway()` in `Program.cs`.
 
 For a complete guide, step-by-step code samples, and auto-generated routing details, see the **[Configuring the Gateway via YARP Guide](docs/features-and-options.md#configuring-the-gateway-via-yarp)**.
+
+---
+
+## 🌐 Server-Side URL Resolution
+
+To support various environments and multi-server topologies, the dashboard dynamically computes absolute URLs for registered microservices on the server side:
+* **Development Heuristics**: Automatically treats environments like `Development` or `LocalDev` as local debugging sessions, outputting direct Kestrel ports (e.g., `http://localhost:5001`) to bypass gateways.
+* **IIS Site Sharing**: Detects if the dashboard and child apps share the same IIS Web Site name (e.g. `"Default Web Site"`), resolving sub-application paths automatically: `scheme://Request.Host{AppPath}`.
+* **Standalone Ports**: Falls back to dedicated host ports for standalone websites, Windows Services, and Linux daemons: `scheme://Request.Host.Host:{AssignedPort}`.
+* **Dynamic Scale**: Resolves links using visiting HTTP headers, allowing seamless access via private IPs, load-balancer DNS, or domain aliases.
+* **Configuration Overrides**: Manually configure explicit endpoints (`AppPipe:Endpoints:{Resource}`) or force gateway URLs using `AppPipe:UseGatewayUrls`.
+
+For detailed information, see the **[Dashboard Server-Side URL Resolution Reference](docs/features-and-options.md#5-server-side-url-resolution)**.
 
 ---
 

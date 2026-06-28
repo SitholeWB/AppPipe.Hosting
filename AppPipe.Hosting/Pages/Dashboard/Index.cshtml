@@ -100,10 +100,7 @@
                     });
                     envVarsTableHtml += '</tbody></table>';
                 }
-
-                const targetUrl = srv.appPath 
-                    ? `${window.location.protocol}//${window.location.host}${srv.appPath.startsWith('/') ? srv.appPath : '/' + srv.appPath}` 
-                    : (srv.port ? `${window.location.protocol}//${window.location.hostname}:${srv.port}` : 'N/A');
+                const targetUrl = srv.url || 'N/A';
                 
                 const linkHtml = targetUrl !== 'N/A' 
                     ? `<a href="${targetUrl}" target="_blank" style="color:var(--accent); font-weight:600; word-break: break-all;">${targetUrl}</a>` 

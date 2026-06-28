@@ -1,3 +1,4 @@
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
 @{
     var path = Context.Request.Path.Value?.ToLower() ?? "";
 }
@@ -832,6 +833,7 @@
 
     <script>
         const state = {
+            isDevelopment: @(string.Equals(Env.EnvironmentName, "Development", System.StringComparison.OrdinalIgnoreCase) ? "true" : "false"),
             activeTab: 'services',
             services: [],
             logs: [],

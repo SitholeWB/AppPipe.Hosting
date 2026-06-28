@@ -1,3 +1,4 @@
+@page "/"
 @namespace AppPipeProjectTest.Web.Components
 @using System.Net.Http
 @using System.Net.Http.Json
@@ -9,6 +10,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    @{
+        var pathBase = HttpContext?.Request?.PathBase.Value ?? "/";
+        if (!pathBase.EndsWith("/")) pathBase += "/";
+    }
+    <base href="@pathBase" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AppPipe Products Dashboard</title>
@@ -276,6 +282,9 @@
 </html>
 
 @code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
     private List<ProductItem>? products;
     private string newProductName = "";
     private decimal newProductPrice = 0.01m;
