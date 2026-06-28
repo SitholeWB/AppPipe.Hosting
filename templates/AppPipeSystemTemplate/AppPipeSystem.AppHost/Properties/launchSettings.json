@@ -5,7 +5,10 @@
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "dashboard",
-      "applicationUrl": "http://localhost:7001"
+      "applicationUrl": "http://localhost:7001",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
     }
   }
 }

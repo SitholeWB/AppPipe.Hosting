@@ -17,6 +17,15 @@ public class AppPipeDevHostRunner
 
     public async Task RunAsync()
     {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")))
+        {
+            Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
+        }
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")))
+        {
+            Environment.SetEnvironmentVariable("DOTNET_ENVIRONMENT", "Development");
+        }
+
         Console.WriteLine("AppPipe.NET DevHost Starting...");
 
         // Ensure all child processes are terminated when this host exits.
@@ -113,11 +122,14 @@ public class AppPipeDevHostRunner
             await WaitForPortAsync(dep.AssignedPort);
         }
 
+        var hostEnv = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
         var envVars = new Dictionary<string, string>
         {
             ["ASPNETCORE_URLS"] = $"http://localhost:{resource.AssignedPort}",
             ["PORT"] = resource.AssignedPort.ToString(),
-            ["OTEL_EXPORTER_OTLP_ENDPOINT"] = $"http://localhost:{gatewayPort}"
+            ["OTEL_EXPORTER_OTLP_ENDPOINT"] = $"http://localhost:{gatewayPort}",
+            ["ASPNETCORE_ENVIRONMENT"] = hostEnv,
+            ["DOTNET_ENVIRONMENT"] = hostEnv
         };
 
         foreach (var reference in resource.References)
