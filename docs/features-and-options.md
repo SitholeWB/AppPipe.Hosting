@@ -284,6 +284,11 @@ internal class Program
             .WithServiceDescription("Public-facing gateway and endpoint handler.")
             .WithServiceStartType("auto");
 
+        // 5b. (Optional) Register Node/React/Angular frontend application using the new AddFrontendApp helper:
+        // builder.AddFrontendApp("ReactUI", "./src/ui", PackageManager.Yarn, "start");
+        // Or using custom commands (like dotnet watch or yarn workspace):
+        // builder.AddFrontendApp("WorkerWatch", "./src/worker", "dotnet watch run --project ./src/worker/worker.csproj");
+
         // 6. Build the application graph
         var app = builder.Build();
 

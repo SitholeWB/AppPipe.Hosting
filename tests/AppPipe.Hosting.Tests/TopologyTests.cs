@@ -86,4 +86,42 @@ public class TopologyTests
         // Let's verify that the reference dependency has been registered in the resource.
         Assert.Contains(backend, frontend.References);
     }
+
+    [Fact]
+    public void AddFrontendApp_WithPackageManager_ShouldConfigureExecutableResource()
+    {
+        // Arrange
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
+
+        // Act
+        var app = builder.AddFrontendApp("ui", "C:\\projects\\ui", PackageManager.Yarn, "start");
+
+        // Assert
+        Assert.NotNull(app);
+        Assert.Equal("ui", app.Name);
+        Assert.Equal("C:\\projects\\ui", app.WorkingDirectory);
+        
+        var isWindows = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
+        var expectedCmd = isWindows ? "yarn.cmd" : "yarn";
+        Assert.Equal(expectedCmd, app.Command);
+        Assert.Equal(new[] { "run", "start" }, app.Args);
+    }
+
+    [Fact]
+    public void AddFrontendApp_WithCustomCommand_ShouldTokenizeArgsCorrectly()
+    {
+        // Arrange
+        var builder = AppPipeHostingApp.CreateBuilder(null!);
+
+        // Act
+        var app = builder.AddFrontendApp("ui", "C:\\projects\\ui", "yarn workspace 'my-ui' start --port 4200", "--mode", "production");
+
+        // Assert
+        Assert.NotNull(app);
+        Assert.Equal("ui", app.Name);
+        Assert.Equal("yarn", app.Command);
+        
+        var expectedArgs = new[] { "workspace", "my-ui", "start", "--port", "4200", "--mode", "production" };
+        Assert.Equal(expectedArgs, app.Args);
+    }
 }
