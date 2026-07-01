@@ -136,8 +136,32 @@ The resolved URL is computed for each resource using the following order of prec
 5. **Multi-Server & Load Balancer Scaling**:
    Rather than using hardcoded hostnames, the URL resolution engine parses the incoming HTTP request properties (`httpContext.Request.Scheme`, `Request.Host.Value`, and `Request.Host.Host`). This ensures that if the dashboard is accessed via a private IP, load-balancer DNS, or localhost, the links adapt dynamically and resolve correctly for the visiting client.
 
----
+### 6. IIS Shared Hosting Deployment
+For shared hosting environments (such as Plesk, cPanel, or Azure App Service) where background processes and command execution are blocked, AppPipe supports a dedicated deployment target: `iis-shared`.
 
+#### 📂 Deployment Compilation Layout
+When compiling with the `iis-shared` target, AppPipe organizes all microservice binaries into a single directory structure:
+* **Gateway/Dashboard**: Published directly into the root folder (`publish/shared-hosting/`).
+* **Microservices**: Published in directories corresponding to their configured `AppPath` (e.g. `publish/shared-hosting/BackendApi/`).
+* **Auto-Generated web.config**: A `web.config` file is automatically created inside each sub-application folder to launch the child process in-process under IIS, with the required telemetry endpoints pre-configured.
+
+#### 🚀 Automated FTP/FTPS Sync
+You can optionally configure the deployer to automatically sync the compiled directory structure to your remote server over FTP/FTPS by setting the following options in `appsettings.json` or passing them as environment variables:
+* `AppPipe:Deployment:Ftp:Host` (FTP server address, or `APH_FTP_HOST` environment variable)
+* `AppPipe:Deployment:Ftp:Username` (`APH_FTP_USER` environment variable)
+* `AppPipe:Deployment:Ftp:Password` (`APH_FTP_PASS` environment variable)
+* `AppPipe:Deployment:Ftp:RemotePath` (Remote target folder, e.g., `/httpdocs` or `/site/wwwroot`)
+* `AppPipe:Deployment:Ftp:Port` (Defaults to 21)
+* `AppPipe:Deployment:Ftp:UseSsl` (Defaults to true)
+
+#### ⚙️ Manual IIS Setup (Shared Hosting Panel)
+After uploading the folders (either via the auto-FTP pipeline or manually copying files):
+1. Log in to your hosting control panel (Plesk/cPanel).
+2. Go to Virtual Directories or File Manager.
+3. Locate the directories matching your microservices (e.g. `/BackendApi` or `/Web`).
+4. Click **"Convert to Application"** (or **"Set as Application"**) on each directory. This enables IIS to isolate their process space and parse their specific `web.config` configurations.
+
+---
 
 ## 📦 Project Scaffolding Templates
 
@@ -344,7 +368,7 @@ internal class Program
         var config = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: true)
             .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")}.json", optional: true)
-            .AddEnvironmentVariables(prefix: "APPIPE__") // e.g. APPIPE__BackendWorker__ServicePassword
+            .AddEnvironmentVariables(prefix: "APH__") // e.g. APH__BackendWorker__ServicePassword
             .AddCommandLine(args)
             .Build();
 
@@ -555,10 +579,10 @@ jobs:
         dotnet C:\inetpub\apps\AppPipe\AppPipe.DevHost\AppPipe.DevHost.dll --deploy iis --prepublished-dir C:\inetpub\apps\AppPipe
       env:
         # Securely inject environment configuration and secrets
-        APPIPE__Dashboard__UseWebSockets: "false"
-        APPIPE__BackendWorker__AppPoolName: "ProductionBackendPool"
-        APPIPE__BackendWorker__ServiceAccount: "DOMAIN\\SvcAccount"
-        APPIPE__BackendWorker__ServicePassword: ${{ secrets.IIS_SVC_ACCOUNT_PASSWORD }}
+        APH__Dashboard__UseWebSockets: "false"
+        APH__BackendWorker__AppPoolName: "ProductionBackendPool"
+        APH__BackendWorker__ServiceAccount: "DOMAIN\\SvcAccount"
+        APH__BackendWorker__ServicePassword: ${{ secrets.IIS_SVC_ACCOUNT_PASSWORD }}
 ```
 
 #### B. Azure DevOps (YAML)
@@ -570,9 +594,9 @@ trigger:
 
 variables:
   # Secret variables like $(iis.svc.password) are configured in the Azure DevOps Variable Group
-  APPIPE__BackendWorker__ServicePassword: $(iis.svc.password)
-  APPIPE__BackendWorker__ServiceAccount: 'DOMAIN\SvcAccount'
-  APPIPE__BackendWorker__AppPoolName: 'ProductionBackendPool'
+  APH__BackendWorker__ServicePassword: $(iis.svc.password)
+  APH__BackendWorker__ServiceAccount: 'DOMAIN\SvcAccount'
+  APH__BackendWorker__AppPoolName: 'ProductionBackendPool'
 
 stages:
 - stage: BuildStage
@@ -636,7 +660,7 @@ stages:
                 dotnet C:\inetpub\apps\AppPipe\drop\AppPipe.DevHost\AppPipe.DevHost.dll --deploy iis --prepublished-dir C:\inetpub\apps\AppPipe\drop
             env:
               # Secret bindings are automatically mapped via variables
-              APPIPE__BackendWorker__ServicePassword: $(APPIPE__BackendWorker__ServicePassword)
+              APH__BackendWorker__ServicePassword: $(APH__BackendWorker__ServicePassword)
 ```
 
 ---

@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using Microsoft.Extensions.Configuration;
 
 namespace AppPipe.Hosting;
 
@@ -156,9 +160,17 @@ public class AppPipeHostingAppBuilder
 
     public AppPipeHostingApp Build()
     {
-        return new AppPipeHostingApp(_resources, HostProject)
+        var configBuilder = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddEnvironmentVariables(prefix: "APH__")
+            .AddCommandLine(Args);
+
+        var config = configBuilder.Build();
+
+        return new AppPipeHostingApp(_resources, HostProject, Args)
         {
-            ConfigureGatewayAction = ConfigureGatewayAction
+            ConfigureGatewayAction = ConfigureGatewayAction,
+            Configuration = config
         };
     }
 }
@@ -168,11 +180,15 @@ public class AppPipeHostingApp
     public IReadOnlyList<AppPipeHostingResource> Resources { get; }
     public AppPipeHostingProjectResource? HostProject { get; }
     public Action<Microsoft.AspNetCore.Builder.WebApplicationBuilder>? ConfigureGatewayAction { get; set; }
+    public string[] Args { get; }
+    public IConfiguration Configuration { get; set; }
 
-    public AppPipeHostingApp(IEnumerable<AppPipeHostingResource> resources, AppPipeHostingProjectResource? hostProject = null)
+    public AppPipeHostingApp(IEnumerable<AppPipeHostingResource> resources, AppPipeHostingProjectResource? hostProject = null, string[]? args = null)
     {
         Resources = new List<AppPipeHostingResource>(resources).AsReadOnly();
         HostProject = hostProject;
+        Args = args ?? Array.Empty<string>();
+        Configuration = new ConfigurationBuilder().Build();
     }
 
     public static AppPipeHostingAppBuilder CreateBuilder(string[] args)

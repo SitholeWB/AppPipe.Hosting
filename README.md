@@ -401,6 +401,12 @@ dotnet run --project YourDevHost.csproj -- --deploy iis /app-pipe-host-test
 
 # Deploy as Windows Services
 dotnet run --project YourDevHost.csproj -- --deploy windows-service
+
+# Deploy to IIS Shared Hosting (creates publish/shared-hosting directory and a zip archive)
+dotnet run --project YourDevHost.csproj -- --deploy iis-shared
+
+# Deploy to IIS Shared Hosting with automatic FTP sync
+dotnet run --project YourDevHost.csproj -- --deploy iis-shared --AppPipe:Deployment:Ftp:Host "ftp.myhost.com" --AppPipe:Deployment:Ftp:Username "user" --AppPipe:Deployment:Ftp:Password "secret"
 ```
 
 ---
@@ -435,7 +441,7 @@ To avoid hardcoding values (like AppPool names, Service Accounts, or database pa
 // Program.cs
 var config = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json", optional: true)
-    .AddEnvironmentVariables(prefix: "APPIPE__")
+    .AddEnvironmentVariables(prefix: "APH__")
     .AddCommandLine(args)
     .Build();
 
@@ -449,9 +455,9 @@ builder.AddProject("BackendWorker")
 ```
 
 #### Injecting Values securely in your CD pipeline:
-* **As Environment Variables**: Map pipeline variables or secrets as environment variables prefixed with `APPIPE__`:
-  * `APPIPE__BackendWorker__AppPoolName` $\rightarrow$ `ProductionPool`
-  * `APPIPE__BackendWorker__ServicePassword` $\rightarrow$ `$(SecretServicePasswordValue)`
+* **As Environment Variables**: Map pipeline variables or secrets as environment variables prefixed with `APH__`:
+  * `APH__BackendWorker__AppPoolName` $\rightarrow$ `ProductionPool`
+  * `APH__BackendWorker__ServicePassword` $\rightarrow$ `$(SecretServicePasswordValue)`
 * **As Command-line Arguments**:
   ```bash
   dotnet AppPipe.DevHost.dll --deploy iis --prepublished-dir C:\inetpub\apps\AppPipe --BackendWorker:AppPoolName "ProductionPool" --BackendWorker:ServicePassword "$(SecretServicePasswordValue)"

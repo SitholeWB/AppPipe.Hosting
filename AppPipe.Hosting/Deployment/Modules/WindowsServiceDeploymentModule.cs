@@ -18,10 +18,12 @@ namespace AppPipe.Hosting;
 public class WindowsServiceDeploymentModule : Module<CommandResult[]>
 {
     private readonly AppPipeHostingApp _app;
+    private readonly DeploymentOptions _options;
 
-    public WindowsServiceDeploymentModule(AppPipeHostingApp app)
+    public WindowsServiceDeploymentModule(AppPipeHostingApp app, DeploymentOptions options)
     {
         _app = app;
+        _options = options;
     }
 
     protected override async Task<SkipDecision> ShouldSkip(IPipelineContext context)
@@ -47,20 +49,30 @@ public class WindowsServiceDeploymentModule : Module<CommandResult[]>
     {
         var results = new List<CommandResult>();
         var telemetryPort = GetFreePort();
+        
+        var isFiltered = _options.ProjectsFilter != null && _options.ProjectsFilter.Count > 0;
 
         // 1. Deploy the Host Project (Gateway / Dashboard)
         if (_app.HostProject != null)
         {
-            var envVars = new Dictionary<string, string>
+            var deployHost = !isFiltered || _options.ProjectsFilter!.Contains(_app.HostProject.Name, StringComparer.OrdinalIgnoreCase);
+            if (deployHost)
             {
-                { "TELEMETRY_PORT", telemetryPort.ToString() },
-                { "WINDOWS_SERVICE", "true" },
-                { "ASPNETCORE_ENVIRONMENT", "Production" },
-                { "ASPNETCORE_URLS", $"http://localhost:{_app.HostProject.AssignedPort}" },
-                { "PORT", _app.HostProject.AssignedPort.ToString() }
-            };
+                var envVars = new Dictionary<string, string>
+                {
+                    { "TELEMETRY_PORT", telemetryPort.ToString() },
+                    { "WINDOWS_SERVICE", "true" },
+                    { "ASPNETCORE_ENVIRONMENT", "Production" },
+                    { "ASPNETCORE_URLS", $"http://localhost:{_app.HostProject.AssignedPort}" },
+                    { "PORT", _app.HostProject.AssignedPort.ToString() }
+                };
 
-            await DeployService(context, _app.HostProject, envVars, cancellationToken, results);
+                await DeployService(context, _app.HostProject, envVars, cancellationToken, results);
+            }
+            else
+            {
+                context.Logger.LogInformation($"Skipping Host Project '{_app.HostProject.Name}' deployment (not in ProjectsFilter).");
+            }
         }
 
         // 2. Deploy Child Projects
@@ -68,6 +80,12 @@ public class WindowsServiceDeploymentModule : Module<CommandResult[]>
         {
             if (resource is AppPipeHostingProjectResource project)
             {
+                if (isFiltered && !_options.ProjectsFilter!.Contains(project.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    context.Logger.LogInformation($"Skipping Windows Service deployment for '{project.Name}' (not in ProjectsFilter).");
+                    continue;
+                }
+
                 var envVars = new Dictionary<string, string>
                 {
                     { "OTEL_EXPORTER_OTLP_ENDPOINT", $"http://localhost:{telemetryPort}" },

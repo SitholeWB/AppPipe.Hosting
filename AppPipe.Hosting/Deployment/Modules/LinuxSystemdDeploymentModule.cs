@@ -53,22 +53,38 @@ public class LinuxSystemdDeploymentModule : Module<CommandResult[]>
         var projectsToDeploy = new List<(AppPipeHostingProjectResource Project, Dictionary<string, string> EnvVars)>();
         var telemetryPort = GetFreePort();
 
+        var isFiltered = _options.ProjectsFilter != null && _options.ProjectsFilter.Count > 0;
+
         if (_app.HostProject != null)
         {
-            var envVars = new Dictionary<string, string>
+            var deployHost = !isFiltered || _options.ProjectsFilter!.Contains(_app.HostProject.Name, StringComparer.OrdinalIgnoreCase);
+            if (deployHost)
             {
-                { "TELEMETRY_PORT", telemetryPort.ToString() },
-                { "LINUX_SERVICE", "true" },
-                { "ASPNETCORE_ENVIRONMENT", "Production" },
-                { "ASPNETCORE_URLS", $"http://localhost:{_app.HostProject.AssignedPort}" }
-            };
-            projectsToDeploy.Add((_app.HostProject, envVars));
+                var envVars = new Dictionary<string, string>
+                {
+                    { "TELEMETRY_PORT", telemetryPort.ToString() },
+                    { "LINUX_SERVICE", "true" },
+                    { "ASPNETCORE_ENVIRONMENT", "Production" },
+                    { "ASPNETCORE_URLS", $"http://localhost:{_app.HostProject.AssignedPort}" }
+                };
+                projectsToDeploy.Add((_app.HostProject, envVars));
+            }
+            else
+            {
+                context.Logger.LogInformation($"Skipping systemd deployment for Host Project '{_app.HostProject.Name}' (not in ProjectsFilter).");
+            }
         }
 
         foreach (var resource in _app.Resources)
         {
             if (resource is AppPipeHostingProjectResource project)
             {
+                if (isFiltered && !_options.ProjectsFilter!.Contains(project.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    context.Logger.LogInformation($"Skipping systemd deployment for '{project.Name}' (not in ProjectsFilter).");
+                    continue;
+                }
+
                 var envVars = new Dictionary<string, string>
                 {
                     { "OTEL_EXPORTER_OTLP_ENDPOINT", $"http://localhost:{telemetryPort}" },

@@ -15,10 +15,12 @@ namespace AppPipe.Hosting;
 public class PublishProjectsModule : Module<CommandResult[]>
 {
     private readonly AppPipeHostingApp _app;
+    private readonly DeploymentOptions _options;
 
-    public PublishProjectsModule(AppPipeHostingApp app)
+    public PublishProjectsModule(AppPipeHostingApp app, DeploymentOptions options)
     {
         _app = app;
+        _options = options;
     }
 
     protected override async Task<CommandResult[]?> ExecuteAsync(IPipelineContext context, CancellationToken cancellationToken)
@@ -85,10 +87,18 @@ public class PublishProjectsModule : Module<CommandResult[]>
             }
         }
 
+        var isFiltered = _options.ProjectsFilter != null && _options.ProjectsFilter.Count > 0;
+
         foreach (var resource in _app.Resources)
         {
             if (resource is AppPipe.Hosting.AppPipeHostingProjectResource project)
             {
+                if (isFiltered && !_options.ProjectsFilter!.Contains(project.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    context.Logger.LogInformation($"Skipping publish for microservice '{project.Name}' (not in ProjectsFilter).");
+                    continue;
+                }
+
                 var outputPath = Path.Combine(Environment.CurrentDirectory, "publish", project.Name);
                 
                 CleanDirectory(context, outputPath);
@@ -106,18 +116,26 @@ public class PublishProjectsModule : Module<CommandResult[]>
 
         if (_app.HostProject != null)
         {
-            var outputPath = Path.Combine(Environment.CurrentDirectory, "publish", _app.HostProject.Name);
-            
-            CleanDirectory(context, outputPath);
-            
-            context.Logger.LogInformation($"Publishing Host Project {_app.HostProject.Name} to {outputPath}...");
-            
-            var result = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("dotnet")
+            var publishHost = !isFiltered || _options.ProjectsFilter!.Contains(_app.HostProject.Name, StringComparer.OrdinalIgnoreCase);
+            if (publishHost)
             {
-                Arguments = new[] { "publish", _app.HostProject.ProjectPath, "-c", "Release", "-o", outputPath }
-            }, cancellationToken);
-            
-            results.Add(result);
+                var outputPath = Path.Combine(Environment.CurrentDirectory, "publish", _app.HostProject.Name);
+                
+                CleanDirectory(context, outputPath);
+                
+                context.Logger.LogInformation($"Publishing Host Project {_app.HostProject.Name} to {outputPath}...");
+                
+                var result = await context.Command.ExecuteCommandLineTool(new CommandLineToolOptions("dotnet")
+                {
+                    Arguments = new[] { "publish", _app.HostProject.ProjectPath, "-c", "Release", "-o", outputPath }
+                }, cancellationToken);
+                
+                results.Add(result);
+            }
+            else
+            {
+                context.Logger.LogInformation($"Skipping publish for Host Project '{_app.HostProject.Name}' (not in ProjectsFilter).");
+            }
         }
 
         return results.ToArray();

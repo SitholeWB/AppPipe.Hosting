@@ -55,21 +55,31 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
         var basePath = string.IsNullOrEmpty(_options.IISPath) ? "" : _options.IISPath;
         var telemetryPort = GetFreePort();
 
+        var isFiltered = _options.ProjectsFilter != null && _options.ProjectsFilter.Count > 0;
+
         if (_app.HostProject != null)
         {
-            var hostAppPath = !string.IsNullOrEmpty(basePath) ? basePath : (_app.HostProject.AppPath ?? $"/{_app.HostProject.Name}");
-            if (hostAppPath == "" || hostAppPath == "/")
-                hostAppPath = "/";
+            var deployHost = !isFiltered || _options.ProjectsFilter!.Contains(_app.HostProject.Name, StringComparer.OrdinalIgnoreCase);
+            if (deployHost)
+            {
+                var hostAppPath = !string.IsNullOrEmpty(basePath) ? basePath : (_app.HostProject.AppPath ?? $"/{_app.HostProject.Name}");
+                if (hostAppPath == "" || hostAppPath == "/")
+                    hostAppPath = "/";
+                else
+                {
+                    hostAppPath = hostAppPath.StartsWith("/") ? hostAppPath : "/" + hostAppPath;
+                    hostAppPath = hostAppPath.Replace("//", "/");
+                }
+                var envVars = new Dictionary<string, string>
+                {
+                    { "TELEMETRY_PORT", telemetryPort.ToString() }
+                };
+                await DeployProjectToIIS(context, _app.HostProject, hostAppPath, appCmdPath, cancellationToken, results, envVars, true);
+            }
             else
             {
-                hostAppPath = hostAppPath.StartsWith("/") ? hostAppPath : "/" + hostAppPath;
-                hostAppPath = hostAppPath.Replace("//", "/");
+                context.Logger.LogInformation($"Skipping IIS deployment for Host Project '{_app.HostProject.Name}' (not in ProjectsFilter).");
             }
-            var envVars = new Dictionary<string, string>
-            {
-                { "TELEMETRY_PORT", telemetryPort.ToString() }
-            };
-            await DeployProjectToIIS(context, _app.HostProject, hostAppPath, appCmdPath, cancellationToken, results, envVars, true);
         }
         
 
@@ -77,6 +87,12 @@ public class WindowsIISDeploymentModule : Module<CommandResult[]>
         {
             if (resource is AppPipeHostingProjectResource project)
             {
+                if (isFiltered && !_options.ProjectsFilter!.Contains(project.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    context.Logger.LogInformation($"Skipping IIS deployment for '{project.Name}' (not in ProjectsFilter).");
+                    continue;
+                }
+
                 var appPath = project.AppPath ?? $"/{project.Name}";
                 if (!string.IsNullOrEmpty(basePath) && basePath != "/")
                 {

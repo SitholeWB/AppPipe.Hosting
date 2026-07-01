@@ -86,6 +86,10 @@ internal class Program
                 {
                     target = DeploymentTarget.LinuxCaddy;
                 }
+                else if (targetStr.Equals("iis-shared", StringComparison.OrdinalIgnoreCase) || targetStr.Equals("shared", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.IISSharedHosting;
+                }
                 else
                 {
                     throw new ArgumentException($"Unknown deployment target: {targetStr}");

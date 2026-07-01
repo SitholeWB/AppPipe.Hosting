@@ -45,19 +45,49 @@ internal class Program
             var target = DeploymentTarget.IIS;
             var deployPath = "";
 
-            if (args[0] == "--deploy")
+            if (args[0] == "deploy-service")
+            {
+                target = DeploymentTarget.WindowsService;
+                deployPath = args.Length > 1 ? args[1] : "";
+            }
+            else if (args[0] == "--deploy")
             {
                 var targetStr = args.Length > 1 ? args[1] : "iis";
                 deployPath = args.Length > 2 ? args[2] : "";
 
-                if (targetStr.Equals("iis", StringComparison.OrdinalIgnoreCase))
+                if (targetStr.Equals("windows-service", StringComparison.OrdinalIgnoreCase) || targetStr.Equals("service", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.WindowsService;
+                }
+                else if (targetStr.Equals("iis", StringComparison.OrdinalIgnoreCase))
                 {
                     target = DeploymentTarget.IIS;
                 }
+                else if (targetStr.Equals("iis-shared", StringComparison.OrdinalIgnoreCase) || targetStr.Equals("shared", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.IISSharedHosting;
+                }
+                else if (targetStr.Equals("linux-service", StringComparison.OrdinalIgnoreCase) || targetStr.Equals("systemd", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.LinuxService;
+                }
+                else if (targetStr.Equals("linux-nginx", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.LinuxNginx;
+                }
+                else if (targetStr.Equals("linux-caddy", StringComparison.OrdinalIgnoreCase))
+                {
+                    target = DeploymentTarget.LinuxCaddy;
+                }
                 else
                 {
-                    throw new ArgumentException($"Unsupported deployment target: {targetStr}");
+                    throw new ArgumentException($"Unknown deployment target: {targetStr}");
                 }
+            }
+            else // "deploy"
+            {
+                target = DeploymentTarget.IIS;
+                deployPath = args.Length > 1 ? args[1] : "";
             }
 
             await OnPremDeployer.CompileToOnPremAsync(app, target, deployPath);
