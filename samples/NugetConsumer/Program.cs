@@ -10,7 +10,7 @@ internal class Program
         var builder = AppPipeHostingApp.CreateBuilder(args);
 
         // Configure the host project explicitly
-        builder.HostProject = new AppPipeHostingProjectResource("NugetConsumer", "");
+        builder.HostProject = new AppPipeHostingProjectResource(AppPipeProjects.HostProject, "");
         builder.HostProject.WithEndpoint(7001)
                            .WithAppPath("/NugetConsumer")
                            .WithEnvironment("LOG_LEVEL", "Debug");

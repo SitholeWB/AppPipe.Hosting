@@ -15,7 +15,7 @@ internal class Program
         var builder = AppPipeHostingApp.CreateBuilder(args);
 
         // Initialize the HostProject explicitly without adding it to the child projects list
-        builder.HostProject = new AppPipeHostingProjectResource("AppPipe.DevHost", "");
+        builder.HostProject = new AppPipeHostingProjectResource(AppPipeProjects.HostProject, "");
         // We can't use AddProject("AppPipe.DevHost") because it adds it to the child project list
         // to be executed.
 

@@ -10,7 +10,7 @@ internal class Program
         var builder = AppPipeHostingApp.CreateBuilder(args);
 
         // Configure the Gateway Host itself
-        builder.HostProject = new AppPipeHostingProjectResource("AppPipeSystem.AppHost", "");
+        builder.HostProject = new AppPipeHostingProjectResource(AppPipeProjects.HostProject, "");
         builder.HostProject.WithEndpoint(7001)
                            .WithAppPath("/AppPipeSystem.AppHost")
                            .WithEnvironment("LOG_LEVEL", "Debug");

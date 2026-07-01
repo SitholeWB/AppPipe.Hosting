@@ -144,8 +144,8 @@ builder.ConfigureGateway(gatewayBuilder =>
 });
 
 // Define your microservices topology:
-builder.AddProject("BackendWorker");
-builder.AddProject("FrontendApi");
+builder.AddProject(AppPipeProjects.BackendWorker);
+builder.AddProject(AppPipeProjects.FrontendApi);
 
 var app = builder.Build();
 

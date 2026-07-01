@@ -384,10 +384,15 @@ internal class Program
             .WithAppPool(config["Dashboard:AppPoolName"] ?? "AppPipeDashboardPool")
             .WithServiceDisplayName("AppPipe Telemetry Dashboard")
             .WithServiceDescription("Orchestrates AppPipe microservices and renders telemetry.");
+```
 
+> [!WARNING]
+> **Host Project SDK Requirement**: The host project (e.g. `SocialMedia.AppHost.csproj` or `AppPipe.DevHost.csproj`) **must** use the `<Project Sdk="Microsoft.NET.Sdk.Web">` SDK. If it is configured as a standard console app SDK (`Microsoft.NET.Sdk`), Razor compilation and Blazor routes will fail, leading to **404 Not Found** errors when attempting to access the dashboard.
+
+```csharp
         // 4. Register and configure BackendWorker
         var backendPassword = config["BackendWorker:ServicePassword"];
-        var backend = builder.AddProject("BackendWorker")
+        var backend = builder.AddProject(AppPipeProjects.BackendWorker)
             .WithEndpoint(7002)
             .WithEnvironment("LOG_LEVEL", "Debug")
             .WithAppPool(config["BackendWorker:AppPoolName"] ?? "CustomBackendPool")
@@ -398,9 +403,9 @@ internal class Program
             .WithServiceStartType("auto")
             .WithServiceAccount(config["BackendWorker:ServiceAccount"] ?? "LocalSystem")
             .WithServicePassword(backendPassword);
-
+ 
         // 5. Register and configure FrontendApi (declaring dependency on BackendWorker)
-        var frontend = builder.AddProject("FrontendApi")
+        var frontend = builder.AddProject(AppPipeProjects.FrontendApi)
             .WithReference(backend) // Auto-injects connection variables
             .WithEndpoint(7003)
             .WithEnvironment("LOG_LEVEL", "Debug")
@@ -408,7 +413,7 @@ internal class Program
             .WithIISSite(config["FrontendApi:IISSiteName"] ?? "Default Web Site")
             .WithServiceDisplayName("AppPipe Frontend API Service")
             .WithServiceDescription("Public-facing gateway and endpoint handler.")
-            .WithServiceStartType("auto");
+            .WithServiceStartType("auto");      .WithServiceStartType("auto");
 
         // 5b. (Optional) Register Node/React/Angular frontend application using the new AddFrontendApp helper:
         // builder.AddFrontendApp("ReactUI", "./src/ui", PackageManager.Yarn, "start");

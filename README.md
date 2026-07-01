@@ -360,7 +360,7 @@ AppPipe includes a built-in deployment module utilizing `ModularPipelines` to au
 You can configure environment-specific settings (such as custom IIS AppPools, sites, display names, startup accounts, and hosting models) directly in your orchestrator topology configuration:
 
 ```csharp
-var backend = builder.AddProject("BackendWorker")
+var backend = builder.AddProject(AppPipeProjects.BackendWorker)
     // IIS & Linux Reverse Proxy Settings
     .WithAppPool("CustomBackendPool")
     .WithIISSite("Default Web Site")
@@ -390,6 +390,10 @@ builder.HostProject.WithEndpoint(7001)
                    .WithServiceDisplayName("AppPipe Dashboard Orchestrator")
                    .WithServiceDescription("AppPipe gateway and diagnostic telemetry UI.");
 ```
+
+> [!WARNING]
+> **Host Project SDK Requirement**: The host project (e.g. `YourDevHost.csproj` or `SocialMedia.AppHost.csproj`) **must** use the `<Project Sdk="Microsoft.NET.Sdk.Web">` SDK. If it is configured as a standard console app SDK (`Microsoft.NET.Sdk`), Razor compilation and Blazor routes will fail, leading to **404 Not Found** errors when attempting to access the dashboard.
+
 
 
 ### 3. Running Local Deployments
@@ -448,7 +452,7 @@ var config = new ConfigurationBuilder()
 var appPool = config["BackendWorker:AppPoolName"] ?? "DefaultPool";
 var password = config["BackendWorker:ServicePassword"]; // Read securely
 
-builder.AddProject("BackendWorker")
+builder.AddProject(AppPipeProjects.BackendWorker)
        .WithAppPool(appPool)
        .WithServiceAccount(@"DOMAIN\ServiceAccount")
        .WithServicePassword(password);

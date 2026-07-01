@@ -41,7 +41,12 @@
       <CodeLines Include="{" />
       <CodeLines Include="    public static class AppPipeProjects" />
       <CodeLines Include="    {" />
+      <CodeLines Include="        public const string HostProject = &quot;$(MSBuildProjectName)&quot;%3B" />
+    </ItemGroup>
+    <ItemGroup>
       <CodeLines Include="        public const string %(ProjectReferenceNames.ConstantName) = &quot;%(ProjectReferenceNames.Identity)&quot;%3B" />
+    </ItemGroup>
+    <ItemGroup>
       <CodeLines Include="    }" />
       <CodeLines Include="}" />
     </ItemGroup>
