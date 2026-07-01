@@ -380,7 +380,7 @@ The dashboard itself is represented as `builder.HostProject` (an instance of `Ap
 
 ```csharp
 // Set a custom dashboard application name (used for SCM Service name)
-builder.HostProject = new AppPipeHostingProjectResource("AppPipeDashboard", "");
+builder.HostProject = new AppPipeHostingProjectResource("AppPipeDashboard");
 
 // Configure the dashboard options fluently
 builder.HostProject.WithEndpoint(7001)
@@ -448,6 +448,13 @@ var config = new ConfigurationBuilder()
     .AddEnvironmentVariables(prefix: "APH__")
     .AddCommandLine(args)
     .Build();
+
+// Configure the Gateway Dashboard Host Project
+builder.HostProject = new AppPipeHostingProjectResource(AppPipeProjects.HostProject)
+    .WithEndpoint(7001)
+    .WithIISSite("Default Web Site")
+    .WithAppPath("/")
+    .WithAppPool("AppPipeDashboardPool");
 
 var appPool = config["BackendWorker:AppPoolName"] ?? "DefaultPool";
 var password = config["BackendWorker:ServicePassword"]; // Read securely

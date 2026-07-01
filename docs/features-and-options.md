@@ -377,7 +377,7 @@ internal class Program
 
         // 3. Customize and configure the Dashboard itself (HostProject)
         var dashboardName = config["Dashboard:Name"] ?? "AppPipeDashboard";
-        builder.HostProject = new AppPipeHostingProjectResource(dashboardName, "")
+        builder.HostProject = new AppPipeHostingProjectResource(dashboardName)
             .WithEndpoint(7001)
             .WithIISSite(config["Dashboard:IISSiteName"] ?? "Default Web Site")
             .WithAppPath(config["Dashboard:AppPath"] ?? "/") // Deployed at root site level '/'

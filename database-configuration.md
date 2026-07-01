@@ -143,6 +143,11 @@ builder.ConfigureGateway(gatewayBuilder =>
     gatewayBuilder.Services.AddSingleton<ITelemetryStore, SqliteTelemetryStore>();
 });
 
+// Configure the Gateway Dashboard Host Project
+builder.HostProject = new AppPipeHostingProjectResource(AppPipeProjects.HostProject)
+    .WithEndpoint(7001)
+    .WithAppPath("/AppHost");
+
 // Define your microservices topology:
 builder.AddProject(AppPipeProjects.BackendWorker);
 builder.AddProject(AppPipeProjects.FrontendApi);

@@ -14,7 +14,7 @@ public class DashboardTests
     {
         // 1. Arrange: Create topology and GatewayAppPipeHost
         var builder = AppPipeHostingApp.CreateBuilder(null!);
-        var hostProject = new AppPipeHostingProjectResource("AppPipe.DevHost", "");
+        var hostProject = new AppPipeHostingProjectResource("AppPipe.DevHost");
         hostProject.WithEndpoint(0);
         builder.HostProject = hostProject;
         var app = builder.Build();
@@ -60,7 +60,7 @@ public class DashboardTests
     {
         // 1. Arrange: Create topology with basic auth configured
         var builder = AppPipeHostingApp.CreateBuilder(null!);
-        var hostProject = new AppPipeHostingProjectResource("AppPipe.DevHost", "");
+        var hostProject = new AppPipeHostingProjectResource("AppPipe.DevHost");
         hostProject.WithEndpoint(0);
         builder.HostProject = hostProject;
         var app = builder.Build();
